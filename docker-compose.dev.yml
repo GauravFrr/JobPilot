@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"
+
+  redis:
+    ports:
+      - "6379:6379"
+
+  api:
+    volumes:
+      - ./api:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  workers:
+    volumes:
+      - ./workers:/app
+    command: python scheduler.py
+
+  bot:
+    volumes:
+      - ./bot:/app
+    command: python main.py

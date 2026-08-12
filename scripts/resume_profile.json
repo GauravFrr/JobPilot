@@ -1,0 +1,165 @@
+{
+  "name": "Gaurav Bomra",
+  "email": "gauravdevxd@gmail.com",
+  "phone": "+91 9350661422",
+  "linkedin": "linkedin.com/in/gauravstack",
+  "github": "github.com/GauravFrr",
+  "website": "gauravxd.dev",
+  "location": "Bhiwani, Haryana, India | Open to Remote Worldwide | Immediate Joiner",
+  "target_roles": [
+    "AI Engineer",
+    "Backend Engineer",
+    "Full-Stack Engineer",
+    "Mobile Developer",
+    "Software Engineer"
+  ],
+  "education": [
+    {
+      "institution": "Sh. L.N. Hindu College, Rohtak",
+      "degree": "Bachelor of Computer Applications (BCA)",
+      "start": "Aug 2026 – Present",
+      "location": "Rohtak, Haryana",
+      "status": "current"
+    }
+  ],
+  "experience": [
+    {
+      "role": "Generative AI Engineer",
+      "company": "MemoryOS (Self-Founded)",
+      "date": "Jan 2026 – Present",
+      "location": "Remote",
+      "summary": "Building a universal AI memory layer for LLM platforms",
+      "bullets": [
+        "Built a universal AI memory layer for ChatGPT & Claude that persists context across sessions, by architecting a Next.js 15 + NestJS system with Gemini API memory extraction and a Plasmo Chrome extension.",
+        "Enabled sub-200ms semantic memory retrieval by implementing HNSW vector indexing with gemini-embedding-2 (768 dims) on PostgreSQL + pgvector, backed by Redis + BullMQ."
+      ]
+    },
+    {
+      "role": "Python Development Intern",
+      "company": "Cognifyz IT Solutions Pvt. Ltd.",
+      "date": "Jul 2026 – Aug 2026",
+      "location": "Remote",
+      "summary": "Backend development tasks and data tooling",
+      "bullets": [
+        "Delivered 8 Python modules on schedule, including a BeautifulSoup web scraper and a Matplotlib/Plotly data visualization tool, with clean and documented code."
+      ]
+    },
+    {
+      "role": "Generative AI Engineer",
+      "company": "Freelance (Independent)",
+      "date": "Jan 2022 – Present",
+      "location": "Remote",
+      "summary": "AI systems and automation for clients worldwide",
+      "bullets": [
+        "Eliminated repetitive manual support work for 3+ clients by building a RAG document Q&A system (LangChain + ChromaDB) that let non-technical teams query knowledge bases in plain English.",
+        "Generated 88+ qualified leads per campaign across 6 verticals by designing an AI cold email pipeline (Apollo.io + Instantly.ai + OpenAI) that auto-wrote personalized icebreakers at scale.",
+        "Automated support for 10+ client businesses by deploying LLM chatbots (OpenAI, Anthropic Claude, Ollama) for lead qualification and FAQ handling — replacing manual first-response teams.",
+        "Shipped 5+ production Telegram bots for international clients — trading alerts, lead capture — integrating payment gateways and real-time APIs into event-driven Python backends.",
+        "Ran a fully self-hosted AI coding agent on a Ubuntu VPS (Qwen2.5-Coder 14B via Ollama, smolagents, ChromaDB) to prototype client tools at zero API cost."
+      ]
+    }
+  ],
+  "projects": [
+    {
+      "name": "MemoryOS",
+      "tech": "Next.js, NestJS, pgvector, Redis, Gemini API",
+      "date": "Jan 2026 – Present",
+      "repo": "github.com/GauravFrr/MemoryOs",
+      "bullets": [
+        "Universal AI memory layer for ChatGPT, Claude & Gemini — captures conversations, extracts structured memories, and injects context into new sessions automatically."
+      ]
+    },
+    {
+      "name": "Nyxleads",
+      "tech": "Python, Typer, FastAPI, Supabase, Nuitka",
+      "date": "2026 – Present",
+      "repo": "github.com/GauravFrr/Nyxleads",
+      "bullets": [
+        "Commercial AI lead scraping CLI with license-key auth, hardware fingerprint binding, and 3 subscription tiers with anti-piracy thin-client architecture."
+      ]
+    },
+    {
+      "name": "Retryv",
+      "tech": "FastAPI, Gemini API, ChromaDB, BM25, Streamlit",
+      "date": "2026",
+      "repo": "github.com/GauravFrr/Retryv",
+      "bullets": [
+        "Production-grade RAG system over FastAPI's official documentation using hybrid BM25 + vector retrieval with Reciprocal Rank Fusion (RRF) and a confidence-gated response guard."
+      ]
+    },
+    {
+      "name": "Local Offline AI Coding Agent",
+      "tech": "Qwen2.5-Coder 14B, Ollama, smolagents, ChromaDB, Gradio",
+      "date": "2025",
+      "bullets": [
+        "Fully self-hosted AI coding assistant on Ubuntu VPS with vector memory and streaming chat — zero API costs, running entirely offline."
+      ]
+    }
+  ],
+  "additional_projects": [
+    {
+      "name": "Vyom",
+      "tech": "Python, Claude API, Imagen 3, Veo 3.1",
+      "summary": "AI Hindi YouTube Shorts studio — Claude-generated scripts, AI-generated video and visuals."
+    },
+    {
+      "name": "Rythmiq",
+      "tech": "Kotlin, Jetpack Compose, ExoPlayer, Supabase",
+      "summary": "Spotify-style Android music app for Hindi, Punjabi & English music via JioSaavn API."
+    },
+    {
+      "name": "Atlas Agent",
+      "tech": "Python, LangChain, Gemini 2.5, Groq",
+      "summary": "Autonomous AI agent orchestrating multiple tools across 40+ automated earning workflows."
+    }
+  ],
+  "skills": {
+    "languages": [
+      "Python",
+      "JavaScript",
+      "TypeScript",
+      "Kotlin",
+      "Bash"
+    ],
+    "frameworks": [
+      "FastAPI",
+      "Next.js",
+      "NestJS",
+      "React",
+      "Node.js"
+    ],
+    "databases": [
+      "PostgreSQL",
+      "pgvector",
+      "ChromaDB",
+      "Redis",
+      "Supabase",
+      "Firebase"
+    ],
+    "tools": [
+      "Docker",
+      "Git",
+      "GitHub",
+      "Railway.app",
+      "Linux VPS",
+      "n8n",
+      "Cursor"
+    ],
+    "concepts": [
+      "LangChain",
+      "LangGraph",
+      "RAG",
+      "AI Agents",
+      "Prompt Engineering",
+      "OpenAI API",
+      "Anthropic API",
+      "Gemini API",
+      "Ollama",
+      "smolagents"
+    ]
+  },
+  "certifications": [
+    "Anthropic Academy — Claude 101",
+    "Anthropic Academy — Claude Code 101"
+  ]
+}
