@@ -25,7 +25,7 @@ Doc 14 sequences *phases* and states the milestone for each. This doc breaks eac
 7. Build the Tier A apply worker: construct the full submission payload per the ATS's documented API and hold it (`status = 'ready_to_apply'`) — do not submit yet. Build the separate `apply`-endpoint-triggered submission function (the part that actually fires on a tap) as its own unit, since it's called later from the API, not from this worker's own schedule (doc 06 Tier A/A+ flow).
 8. Wire the whole chain event-driven: new `jobs_raw` row → matcher picks it up → tailoring triggers on match → payload pre-build triggers on tailoring complete → `status = 'ready_to_apply'`, event fired (doc 16 Flow 2). Submission itself only happens later, via the `/apply` endpoint — don't wire it to fire automatically here.
 9. Add Stage 3 LLM rerank for middle-band scores (doc 04) once the base loop is confirmed working end-to-end.
-10. **Exit check:** run against real live sources; confirm at least one real job gets discovered, scored, tailored, and reaches `ready_to_apply` with a correct, non-fabricated resume attached — then manually trigger the `/apply` endpoint and confirm it actually submits and logs a full `applications` audit row. Nothing should submit on its own before that manual trigger.
+10. **Exit check:** run against real live sources; confirm at least one real job gets discovered, scored, tailored, and reaches `ready_to_apply` with a correct, non-fabricated resume attached — then manually trigger the `/apply` endpoint and confirm it actually submits and logs a full `applications` audit row. Nothing should submit on its own before that manual trigger. [COMPLETED]
 
 ## Phase 2 — Telegram Bot
 
