@@ -1,6 +1,8 @@
 import os
 import sys
 import logging
+import json
+import redis
 import httpx
 from datetime import datetime, date, time
 from sqlalchemy import select, func, and_
@@ -15,8 +17,25 @@ from app.models.jobs import JobRaw
 from app.models.resumes import ResumeVersion, ResumeProfile
 from app.models.applications import Application
 from app.models.settings import Setting
+from app.config import settings
 
 logger = logging.getLogger("workers.applying.tier_a_apply")
+
+def publish_event(event_type: str, job_id: str, payload_data: dict):
+    """Publishes an event to the Redis pub/sub channel 'jobpilot:events'."""
+    try:
+        r = redis.from_url(settings.redis_url)
+        event = {
+            "event_type": event_type,
+            "job_id": job_id,
+            "payload": payload_data,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        r.publish("jobpilot:events", json.dumps(event))
+        r.close()
+        logger.info(f"Published event '{event_type}' to Redis for job {job_id}")
+    except Exception as e:
+        logger.error(f"Failed to publish event to Redis: {str(e)}")
 
 async def get_daily_cap(session: AsyncSession, platform: str) -> int:
     """Gets the daily cap limit for a platform, defaulting to 15 if not configured."""
@@ -155,6 +174,10 @@ async def pre_build_application_payload(job_id: str) -> Optional[Application]:
             
             await session.commit()
             logger.info(f"Pre-built application payload for '{job.title}' at '{job.company}'. Saved in ready_to_apply state.")
+            
+            # Publish event to Redis
+            publish_event("job.ready_to_apply", str(job.id), {"application_id": str(app.id)})
+            
             return app
             
         except Exception as e:
@@ -258,10 +281,15 @@ async def execute_submission(application_id: str) -> bool:
                 job.status = "applied"
                 app.result = result_log
                 logger.info(f"Application {application_id} successfully submitted!")
+                # Publish applied event to Redis
+                publish_event("job.applied", str(job.id), {"application_id": application_id})
             else:
                 app.status = "failed"
                 app.result = result_log
                 logger.error(f"Application {application_id} submission failed: {result_log}")
+                # Publish failed event to Redis
+                error_msg = result_log.get("body", "Submission failed") if isinstance(result_log, dict) else "Submission failed"
+                publish_event("job.application_failed", str(job.id), {"application_id": application_id, "error": error_msg})
                 
             await session.commit()
             return success

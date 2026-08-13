@@ -3,6 +3,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.routes.applications import router as applications_router
+from app.routes.settings import router as settings_router
 
 app = FastAPI(
     title="JobPilot API",
@@ -12,6 +13,7 @@ app = FastAPI(
 
 # Mount routes under /api/v1 prefix
 app.include_router(applications_router, prefix="/api/v1")
+app.include_router(settings_router, prefix="/api/v1")
 
 @app.get("/health")
 async def health_check(db: AsyncSession = Depends(get_db)):
