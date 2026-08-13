@@ -8,7 +8,7 @@ import { getJob, passApplication, markApplied, getResumePdfUrl, type Job } from 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'overview' | 'resume' | 'contact' | 'match' | 'log' | 'outreach'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'resume' | 'contact' | 'match' | 'log'>('overview');
   const [acting, setActing] = useState(false);
 
   const { data: job, isLoading, mutate } = useSWR<Job>(
@@ -168,7 +168,7 @@ export default function JobDetailPage() {
 
       {/* Tabs */}
       <div className="tabs mb-4">
-        {(['overview', 'resume', 'contact', 'match', 'log', 'outreach'] as const).map((t) => (
+        {(['overview', 'resume', 'contact', 'match', 'log'] as const).map((t) => (
           <button
             key={t}
             className={`tab${activeTab === t ? ' active' : ''}`}
@@ -179,7 +179,6 @@ export default function JobDetailPage() {
             {t === 'contact'  && 'Contact'}
             {t === 'match'    && 'Match Details'}
             {t === 'log'      && 'Application Log'}
-            {t === 'outreach' && 'Outreach'}
           </button>
         ))}
       </div>
@@ -280,7 +279,7 @@ export default function JobDetailPage() {
                     <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{c.name}</h4>
                     <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{c.title} {c.company ? `@ ${c.company}` : ''}</p>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-2 items-center">
                     {c.linkedin_url && (
                       <a href={c.linkedin_url} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-xs">
                         LinkedIn ↗
@@ -294,6 +293,9 @@ export default function JobDetailPage() {
                         {c.email_confidence}: {c.email}
                       </span>
                     )}
+                    <button className="btn btn-outline btn-xs" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
+                      Message Contact (Phase 5)
+                    </button>
                   </div>
                 </div>
 
@@ -429,50 +431,6 @@ export default function JobDetailPage() {
         </div>
       )}
 
-      {/* ── Outreach tab ────────────────────────────────────────────────────── */}
-      {activeTab === 'outreach' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {(job.outreach_drafts ?? []).length === 0 ? (
-            <div className="empty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 32, height: 32, margin: '0 auto 8px', opacity: 0.5 }}>
-                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
-                <polyline points="22,6 12,13 2,6" />
-              </svg>
-              <div className="empty-title">No outreach drafts</div>
-              <div className="empty-sub">LinkedIn / cold email drafts will appear here</div>
-            </div>
-          ) : (
-            job.outreach_drafts.map((d) => (
-              <div key={d.id} className="card">
-                <div className="flex justify-between items-center" style={{ marginBottom: 8 }}>
-                  <div className="flex gap-2 items-center">
-                    <span className="badge badge-muted">{d.channel}</span>
-                    {d.sent
-                      ? <span className="badge badge-green">Sent</span>
-                      : <span className="badge badge-amber">Draft</span>
-                    }
-                  </div>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    {new Date(d.created_at).toLocaleString()}
-                  </span>
-                </div>
-                <pre style={{
-                  background: 'var(--bg-surface)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 'var(--radius)',
-                  padding: 12,
-                  fontSize: 12,
-                  color: 'var(--text-secondary)',
-                  whiteSpace: 'pre-wrap',
-                  fontFamily: 'var(--font-sans)',
-                  lineHeight: 1.5,
-                }}>
-                  {d.draft_text}
-                </pre>
-              </div>
-            ))
-          )}
-        </div>
       )}
     </>
   );
