@@ -22,6 +22,38 @@ router = APIRouter(
     tags=["settings"]
 )
 
+# ─── Aggregated settings for the web dashboard ───────────────────────────────
+
+@router.get("")
+async def get_settings_summary(db: AsyncSession = Depends(get_db)):
+    """Return all settings the dashboard cares about in one call."""
+    chat_id = await get_setting_value(db, "telegram_chat_id", None)
+    min_match_score = await get_setting_value(db, "min_match_score", 70)
+    auto_apply_tier = await get_setting_value(db, "auto_apply_tier", "A")
+    preferred_sources = await get_setting_value(db, "preferred_sources", [])
+    pause_automation = await get_setting_value(db, "pause_automation", False)
+    return {
+        "chat_id": chat_id,
+        "min_match_score": min_match_score,
+        "auto_apply_tier": auto_apply_tier,
+        "preferred_sources": preferred_sources,
+        "pause_automation": pause_automation,
+    }
+
+@router.put("")
+async def update_settings_summary(payload: Dict[str, Any], db: AsyncSession = Depends(get_db)):
+    """Update any subset of aggregated settings."""
+    if "min_match_score" in payload:
+        await set_setting_value(db, "min_match_score", float(payload["min_match_score"]))
+    if "auto_apply_tier" in payload:
+        await set_setting_value(db, "auto_apply_tier", str(payload["auto_apply_tier"]))
+    if "preferred_sources" in payload:
+        await set_setting_value(db, "preferred_sources", list(payload["preferred_sources"]))
+    if "pause_automation" in payload:
+        await set_setting_value(db, "pause_automation", bool(payload["pause_automation"]))
+    await db.commit()
+    return await get_settings_summary(db)
+
 # Helper functions for key-value settings
 async def get_setting_value(db: AsyncSession, key: str, default: Any) -> Any:
     stmt = select(Setting).where(Setting.key == key)
