@@ -21,6 +21,7 @@ class JobRaw(Base):
     discovered_at = Column(DateTime(timezone=True), server_default=func.now())
     raw_payload = Column(JSONB, nullable=True)
     status = Column(String, nullable=False, default="discovered")
+    is_test = Column(Boolean, nullable=False, server_default="false", default=False)
 
     __table_args__ = (
         UniqueConstraint("source", "source_job_id", name="uq_source_source_job_id"),

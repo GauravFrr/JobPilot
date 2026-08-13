@@ -26,6 +26,7 @@ class DBJobRaw(Base):
     company = Column(String, nullable=False)
     title = Column(String, nullable=False)
     status = Column(String, nullable=False)
+    is_test = Column(Boolean, nullable=False, default=False)
 
 class DBJobScore(Base):
     __tablename__ = "job_scores"

@@ -21,8 +21,11 @@ from app.config import settings
 
 logger = logging.getLogger("workers.applying.tier_a_apply")
 
-def publish_event(event_type: str, job_id: str, payload_data: dict):
+def publish_event(event_type: str, job_id: str, payload_data: dict, is_test: bool = False):
     """Publishes an event to the Redis pub/sub channel 'jobpilot:events'."""
+    if is_test:
+        logger.info(f"Skipping Redis pub/sub broadcast for test job {job_id} (is_test=True)")
+        return
     try:
         r = redis.from_url(settings.redis_url)
         event = {
@@ -176,7 +179,7 @@ async def pre_build_application_payload(job_id: str) -> Optional[Application]:
             logger.info(f"Pre-built application payload for '{job.title}' at '{job.company}'. Saved in ready_to_apply state.")
             
             # Publish event to Redis
-            publish_event("job.ready_to_apply", str(job.id), {"application_id": str(app.id)})
+            publish_event("job.ready_to_apply", str(job.id), {"application_id": str(app.id)}, is_test=job.is_test)
             
             return app
             
@@ -209,6 +212,18 @@ async def execute_submission(application_id: str) -> bool:
             # Update status to applying
             app.status = "applying"
             await session.commit()
+            
+            # HARD GUARD: Refuse to fire real HTTP requests if it is a test job!
+            if job.is_test:
+                logger.info(f"HARD GUARD: Simulated submission triggered for test job {job.title} at {job.company} (is_test=True). No real request sent.")
+                app.status = "applied"
+                app.applied_at = datetime.now()
+                job.status = "applied"
+                app.result = {"message": "Test submission simulated successfully (is_test=True)."}
+                await session.commit()
+                # Publish test applied event
+                publish_event("job.applied", str(job.id), {"application_id": application_id}, is_test=True)
+                return True
             
             payload = app.request_payload_snapshot
             source_parts = job.source.split(":")
@@ -282,14 +297,14 @@ async def execute_submission(application_id: str) -> bool:
                 app.result = result_log
                 logger.info(f"Application {application_id} successfully submitted!")
                 # Publish applied event to Redis
-                publish_event("job.applied", str(job.id), {"application_id": application_id})
+                publish_event("job.applied", str(job.id), {"application_id": application_id}, is_test=job.is_test)
             else:
                 app.status = "failed"
                 app.result = result_log
                 logger.error(f"Application {application_id} submission failed: {result_log}")
                 # Publish failed event to Redis
                 error_msg = result_log.get("body", "Submission failed") if isinstance(result_log, dict) else "Submission failed"
-                publish_event("job.application_failed", str(job.id), {"application_id": application_id, "error": error_msg})
+                publish_event("job.application_failed", str(job.id), {"application_id": application_id, "error": error_msg}, is_test=job.is_test)
                 
             await session.commit()
             return success

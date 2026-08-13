@@ -107,6 +107,7 @@ async def main():
             location=chosen.get("location"),
             is_remote=chosen.get("is_remote", True),
             status="discovered",
+            is_test=True,
         )
         session.add(db_job)
         await session.flush()

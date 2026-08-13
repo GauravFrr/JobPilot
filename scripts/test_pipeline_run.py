@@ -52,7 +52,8 @@ async def main():
             description_text="We are looking for a Backend Engineer who loves FastAPI, Python, RAG pipelines, and PostgreSQL. You will work on database schema design, vector similarity search with pgvector, and scaling services.",
             location="Remote",
             is_remote=True,
-            status="discovered"
+            status="discovered",
+            is_test=True
         )
         session.add(mock_job)
         await session.commit()
