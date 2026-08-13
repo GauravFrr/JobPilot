@@ -195,8 +195,8 @@ async def execute_submission(application_id: str) -> bool:
             stmt = select(Application).where(Application.id == application_id)
             result = await session.execute(stmt)
             app = result.scalars().first()
-            if not app or app.status != "ready_to_apply":
-                logger.error(f"Application {application_id} is not in ready_to_apply state.")
+            if not app or app.status not in ("ready_to_apply", "applying"):
+                logger.error(f"Application {application_id} is not in ready_to_apply or applying state.")
                 return False
                 
             # Fetch related job
