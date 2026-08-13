@@ -40,9 +40,6 @@
   --radius-sm:      4px;
   --radius:         6px;
   --radius-lg:      8px;
-
-  --font-sans:      'Inter', system-ui, sans-serif;
-  --font-mono:      'JetBrains Mono', monospace;
 }
 
 /* ─── Dark Mode (Manual or System Preference Toggle) ──────────────────────── */
