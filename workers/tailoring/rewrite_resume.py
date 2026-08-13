@@ -36,6 +36,7 @@ TRUTH AND NO-FABRICATION CONSTRAINT (CRITICAL RULE):
 Resume Overhaul Format & Phrasing:
 - Rewrite the bullet points using the Google XYZ structure (accomplishment, measurable outcome, method), but write them in a varied, natural, and professional resume tone.
 - CRITICAL: DO NOT start every bullet with "Accomplished" or use the literal phrases "measured by" or "by doing" in every bullet. Vary the sentence structure and starting action verbs naturally.
+- TENSE CONSISTENCY: Every generated bullet point MUST be written in the past tense (e.g., "Prototyped", "Architected", "Implemented", "Delivered") to maintain grammatical consistency across the entire resume. Do NOT use present-tense verbs (like "Prototypes" or "Develops").
 - Keep the number of bullets per project to 2-3.
 
 Few-shot examples of correct, naturally-phrased XYZ bullets (observe how they do NOT repeat the same opening words):
