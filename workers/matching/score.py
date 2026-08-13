@@ -156,4 +156,16 @@ async def process_matching_for_job(job_id: str) -> Optional[JobScore]:
         except Exception as e:
             await session.rollback()
             logger.error(f"Error matching job {job_id}: {str(e)}")
+            try:
+                # Fail closed: mark as discarded on error
+                async with AsyncSessionLocal() as write_session:
+                    stmt = select(JobRaw).where(JobRaw.id == job_id)
+                    result = await write_session.execute(stmt)
+                    job = result.scalars().first()
+                    if job:
+                        job.status = "discarded"
+                        await write_session.commit()
+                        logger.info(f"Failed matching for job {job_id} - marked as discarded (fail closed).")
+            except Exception as inner_e:
+                logger.error(f"Failed to fail-closed mark job {job_id} as discarded on error: {str(inner_e)}")
             return None

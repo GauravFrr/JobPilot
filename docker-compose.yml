@@ -88,6 +88,20 @@ services:
     networks:
       - jobpilot-network
 
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - FRONTEND_URL=http://localhost:3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    networks:
+      - jobpilot-network
+
 volumes:
   postgres_data:
   redis_data:

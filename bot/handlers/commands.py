@@ -82,7 +82,7 @@ async def cmd_settings(message: types.Message):
     await message.reply(
         "⚙️ **JobPilot Settings**\n\n"
         "Click the link below to access your JobPilot Settings dashboard:\n"
-        "http://localhost:3000/settings#telegram"
+        "http://127.0.0.1:3000/settings#telegram"
     )
 
 @router.message(Command("pending"))
@@ -118,7 +118,7 @@ async def cmd_pending(message: types.Message):
         builder = InlineKeyboardBuilder()
         builder.button(text="✅ Apply", callback_data=f"apply:{app.id}")
         builder.button(text="🚫 Pass", callback_data=f"pass:{app.id}")
-        builder.button(text="🌐 View", url=f"http://localhost:3000/applications/{app.id}")
+        builder.button(text="🌐 View", url=f"http://127.0.0.1:3000/applications/{app.id}")
         builder.adjust(2)
         
         await message.answer(text_content, reply_markup=builder.as_markup())

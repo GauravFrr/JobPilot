@@ -91,3 +91,60 @@ async def pass_job(application_id: str, db: AsyncSession = Depends(get_db)):
         "application_id": str(app.id),
         "status": "skipped"
     }
+
+@router.post("/{application_id}/mark-applied")
+async def mark_applied(application_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    For Tier D / manual leads only — self-tracking, no automation triggered.
+    """
+    stmt = select(Application).where(Application.id == application_id)
+    result = await db.execute(stmt)
+    app = result.scalars().first()
+
+    if not app:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+
+    from datetime import datetime
+    app.status = "applied"
+    app.method = "manual"
+    app.applied_at = datetime.utcnow()
+
+    stmt = select(JobRaw).where(JobRaw.id == app.job_id)
+    result = await db.execute(stmt)
+    job = result.scalars().first()
+    if job:
+        job.status = "applied"
+
+    await db.commit()
+    return {"application_id": str(app.id), "status": "applied", "method": "manual"}
+
+@router.get("/{application_id}")
+async def get_application(application_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    Full audit record for a single application.
+    """
+    stmt = select(Application).where(Application.id == application_id)
+    result = await db.execute(stmt)
+    app = result.scalars().first()
+
+    if not app:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Application not found")
+
+    # Redact sensitive fields per TRD REQ-SEC-3
+    payload = app.request_payload_snapshot
+    if isinstance(payload, dict):
+        for key in ["password", "token", "key", "credentials"]:
+            if key in payload:
+                payload[key] = "[REDACTED]"
+
+    return {
+        "id": str(app.id),
+        "job_id": str(app.job_id),
+        "tier": app.tier,
+        "method": app.method,
+        "status": app.status,
+        "applied_at": app.applied_at.isoformat() if app.applied_at else None,
+        "created_at": app.created_at.isoformat() if app.created_at else None,
+        "request_payload_snapshot": payload,
+        "result": app.result
+    }

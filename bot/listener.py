@@ -84,7 +84,7 @@ async def start_event_listener(bot: Bot):
                     builder = InlineKeyboardBuilder()
                     builder.button(text="✅ Apply", callback_data=f"apply:{app_id}")
                     builder.button(text="🚫 Pass", callback_data=f"pass:{app_id}")
-                    builder.button(text="🌐 View", url=f"http://localhost:3000/applications/{app_id}")
+                    builder.button(text="🌐 View", url=f"http://127.0.0.1:3000/applications/{app_id}")
                     builder.adjust(2)
                     
                     await bot.send_message(chat_id, text, reply_markup=builder.as_markup())
@@ -123,7 +123,7 @@ async def start_event_listener(bot: Bot):
                         # Add Retry / Mark Manual buttons
                         builder = InlineKeyboardBuilder()
                         builder.button(text="🔄 Retry", callback_data=f"apply:{app_id}")
-                        builder.button(text="🌐 View in Dashboard", url=f"http://localhost:3000/applications/{app_id}")
+                        builder.button(text="🌐 View in Dashboard", url=f"http://127.0.0.1:3000/applications/{app_id}")
                         builder.adjust(1)
                         await bot.send_message(chat_id, text, reply_markup=builder.as_markup())
                         

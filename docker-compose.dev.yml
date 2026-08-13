@@ -23,3 +23,9 @@ services:
     volumes:
       - ./bot:/app
     command: python main.py
+
+  web:
+    volumes:
+      - ./web:/app
+      - /app/node_modules
+    command: npm run dev
