@@ -171,12 +171,12 @@ export default function SettingsPage() {
       <div style={{ display: 'grid', gridTemplateColumns: '180px 1fr', gap: 24 }}>
         {/* Anchored Left Nav */}
         <aside style={{ position: 'sticky', top: 24, height: 'fit-content', display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <a href="#resume-profile" className="nav-link" style={{ border: '1px solid var(--border)' }}>📄 Resume Profile</a>
-          <a href="#target-companies" className="nav-link" style={{ border: '1px solid var(--border)' }}>🏢 Target Companies</a>
-          <a href="#thresholds" className="nav-link" style={{ border: '1px solid var(--border)' }}>🎯 Thresholds & Caps</a>
-          <a href="#platform-toggles" className="nav-link" style={{ border: '1px solid var(--border)' }}>📡 Platform Toggles</a>
-          <a href="#default-answers" className="nav-link" style={{ border: '1px solid var(--border)' }}>📋 Screening Answers</a>
-          <a href="#telegram" className="nav-link" style={{ border: '1px solid var(--border)' }}>💬 Telegram Bot</a>
+          <a href="#resume-profile" className="nav-link" style={{ border: '1px solid var(--border)' }}>Resume Profile</a>
+          <a href="#target-companies" className="nav-link" style={{ border: '1px solid var(--border)' }}>Target Companies</a>
+          <a href="#thresholds" className="nav-link" style={{ border: '1px solid var(--border)' }}>Thresholds & Caps</a>
+          <a href="#platform-toggles" className="nav-link" style={{ border: '1px solid var(--border)' }}>Platform Toggles</a>
+          <a href="#default-answers" className="nav-link" style={{ border: '1px solid var(--border)' }}>Screening Answers</a>
+          <a href="#telegram" className="nav-link" style={{ border: '1px solid var(--border)' }}>Telegram Bot</a>
         </aside>
 
         {/* Scrollable Single Page Content */}
@@ -186,17 +186,17 @@ export default function SettingsPage() {
           <section id="resume-profile" className="card flex flex-col gap-3">
             <div className="flex justify-between items-center">
               <div>
-                <h3 style={{ fontSize: 14, fontWeight: 700 }}>📄 Resume Profile</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700 }}>Resume Profile</h3>
                 <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
                   Active version: {profile?.version || '—'} · Last updated: {profile?.created_at ? new Date(profile.created_at).toLocaleDateString() : '—'}
                 </p>
               </div>
               <div className="flex gap-2">
                 <button className="btn btn-outline btn-xs" onClick={handleRecompute} disabled={savingSection === 'recompute'}>
-                  {savingSection === 'recompute' ? 'Recomputing...' : '🔄 Recompute Embeddings'}
+                  {savingSection === 'recompute' ? 'Recomputing...' : 'Recompute Embeddings'}
                 </button>
                 <button className="btn btn-primary btn-xs" onClick={saveProfile} disabled={savingSection === 'profile'}>
-                  {savingSection === 'profile' ? 'Saving...' : '💾 Save Profile'}
+                  {savingSection === 'profile' ? 'Saving...' : 'Save Profile'}
                 </button>
               </div>
             </div>
@@ -213,12 +213,12 @@ export default function SettingsPage() {
             />
             {profileUnsaved && (
               <div style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 600 }}>
-                ⚠ You have unsaved profile changes. Remember to recompute embeddings after saving!
+                Notice: You have unsaved profile changes. Remember to recompute embeddings after saving!
               </div>
             )}
             {profile?.has_embedding === false && (
               <div style={{ fontSize: 11, color: 'var(--red)', fontWeight: 600 }}>
-                ⚠ Embeddings are stale/missing. Tap 'Recompute Embeddings' to update the matcher cache.
+                Notice: Embeddings are stale/missing. Tap 'Recompute Embeddings' to update the matcher cache.
               </div>
             )}
           </section>
@@ -227,11 +227,11 @@ export default function SettingsPage() {
           <section id="target-companies" className="card flex flex-col gap-3">
             <div className="flex justify-between items-center">
               <div>
-                <h3 style={{ fontSize: 14, fontWeight: 700 }}>🏢 Target Companies</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700 }}>Target Companies</h3>
                 <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Manage mapped ATS systems and target career URLs</p>
               </div>
               <button className="btn btn-primary btn-xs" onClick={saveCompanies} disabled={savingSection === 'companies'}>
-                {savingSection === 'companies' ? 'Saving...' : '💾 Save Companies'}
+                {savingSection === 'companies' ? 'Saving...' : 'Save Companies'}
               </button>
             </div>
 
@@ -316,7 +316,7 @@ export default function SettingsPage() {
               style={{ alignSelf: 'flex-start' }}
               onClick={() => setCompaniesList([...companiesList, { name: 'New Company', domain: '', careers_url: '', detected_ats: 'generic' }])}
             >
-              ➕ Add Row
+              Add Row
             </button>
           </section>
 
@@ -324,11 +324,11 @@ export default function SettingsPage() {
           <section id="thresholds" className="card flex flex-col gap-3">
             <div className="flex justify-between items-center">
               <div>
-                <h3 style={{ fontSize: 14, fontWeight: 700 }}>🎯 Thresholds & Caps</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700 }}>Thresholds & Caps</h3>
                 <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Configure match parameters and system safeguards</p>
               </div>
               <button className="btn btn-primary btn-xs" onClick={saveThresholds} disabled={savingSection === 'thresholds'}>
-                {savingSection === 'thresholds' ? 'Saving...' : '💾 Save Settings'}
+                {savingSection === 'thresholds' ? 'Saving...' : 'Save Settings'}
               </button>
             </div>
 
@@ -370,11 +370,11 @@ export default function SettingsPage() {
           <section id="platform-toggles" className="card flex flex-col gap-3">
             <div className="flex justify-between items-center">
               <div>
-                <h3 style={{ fontSize: 14, fontWeight: 700 }}>📡 Platform Toggles</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700 }}>Platform Toggles</h3>
                 <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Enable/disable crawling sources instantly</p>
               </div>
               <button className="btn btn-primary btn-xs" onClick={saveToggles} disabled={savingSection === 'toggles'}>
-                {savingSection === 'toggles' ? 'Saving...' : '💾 Save Toggles'}
+                {savingSection === 'toggles' ? 'Saving...' : 'Save Toggles'}
               </button>
             </div>
 
@@ -404,11 +404,11 @@ export default function SettingsPage() {
           <section id="default-answers" className="card flex flex-col gap-3">
             <div className="flex justify-between items-center">
               <div>
-                <h3 style={{ fontSize: 14, fontWeight: 700 }}>📋 Screening Answers</h3>
+                <h3 style={{ fontSize: 14, fontWeight: 700 }}>Screening Answers</h3>
                 <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Structured JSON feeding the form-filling engine</p>
               </div>
               <button className="btn btn-primary btn-xs" onClick={saveAnswers} disabled={savingSection === 'answers'}>
-                {savingSection === 'answers' ? 'Saving...' : '💾 Save Answers'}
+                {savingSection === 'answers' ? 'Saving...' : 'Save Answers'}
               </button>
             </div>
 
@@ -423,12 +423,12 @@ export default function SettingsPage() {
 
           {/* Section 6: Telegram Pairing */}
           <section id="telegram" className="card flex flex-col gap-3">
-            <h3 style={{ fontSize: 14, fontWeight: 700 }}>💬 Telegram Bot Connection</h3>
+            <h3 style={{ fontSize: 14, fontWeight: 700 }}>Telegram Bot Connection</h3>
             <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>Pair the automation center with your private chat ID</p>
 
             <div className="flex items-center gap-3" style={{ marginTop: 4 }}>
               <button className="btn btn-outline btn-xs" onClick={getPairToken}>
-                🔑 Generate Pairing Token
+                Generate Pairing Token
               </button>
               {pairingToken && (
                 <div style={{
