@@ -2,7 +2,9 @@
 import useSWR from 'swr';
 import { useState } from 'react';
 import Link from 'next/link';
-import { getJobs, type Job, type JobStatus } from '@/lib/api';
+import { getJobs, type Job, type JobStatus, applyApplication, passApplication } from '@/lib/api';
+import toast from 'react-hot-toast';
+import { mutate } from 'swr';
 
 const COLUMNS: { status: JobStatus; label: string; color: string }[] = [
   { status: 'matched',       label: 'Matched',       color: 'var(--accent)' },
@@ -39,7 +41,7 @@ function KanbanColumn({ status, label, color }: { status: JobStatus; label: stri
         </div>
       )}
       {jobs.map((job) => (
-        <JobKanbanCard key={job.id} job={job} />
+        <JobKanbanCard key={job.id} job={job} columnStatus={status} />
       ))}
       {!isLoading && jobs.length === 0 && (
         <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
@@ -50,7 +52,41 @@ function KanbanColumn({ status, label, color }: { status: JobStatus; label: stri
   );
 }
 
-function JobKanbanCard({ job }: { job: Job }) {
+function JobKanbanCard({ job, columnStatus }: { job: Job; columnStatus: JobStatus }) {
+  const [acting, setActing] = useState(false);
+  const latestApp = job.applications?.[0];
+
+  async function handleApply(e: React.MouseEvent) {
+    e.preventDefault();
+    if (!latestApp) return;
+    setActing(true);
+    try {
+      await applyApplication(latestApp.id);
+      toast.success('Applying...');
+      mutate([`/jobs`, columnStatus]);
+      mutate([`/jobs`, 'applying']);
+    } catch (err: any) {
+      toast.error(err.message || 'Apply failed');
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function handlePass(e: React.MouseEvent) {
+    e.preventDefault();
+    if (!latestApp) return;
+    setActing(true);
+    try {
+      await passApplication(latestApp.id);
+      toast.success('Passed');
+      mutate([`/jobs`, columnStatus]);
+    } catch (err: any) {
+      toast.error(err.message || 'Pass failed');
+    } finally {
+      setActing(false);
+    }
+  }
+
   return (
     <Link href={`/jobs/${job.id}`}>
       <div className="job-card">
@@ -60,7 +96,7 @@ function JobKanbanCard({ job }: { job: Job }) {
           <span
             className="badge"
             style={{
-              background: 'rgba(0,0,0,0.2)',
+              background: 'var(--bg-surface)',
               color: scoreColor(job.match_score),
               fontFamily: 'var(--font-mono)',
             }}
@@ -69,14 +105,39 @@ function JobKanbanCard({ job }: { job: Job }) {
           </span>
           <span className="badge badge-muted">{job.source}</span>
         </div>
-        {job.tier && (
-          <span className={`badge ${
-            job.tier === 'A' ? 'badge-green' :
-            job.tier === 'B' ? 'badge-blue' :
-            job.tier === 'C' ? 'badge-amber' : 'badge-muted'
-          }`} style={{ alignSelf: 'flex-start' }}>
-            Tier {job.tier}
-          </span>
+        
+        <div className="flex justify-between items-center" style={{ marginTop: 4 }}>
+          {job.tier && (
+            <span className={`badge ${
+              job.tier === 'A' ? 'badge-green' :
+              job.tier === 'B' ? 'badge-blue' :
+              job.tier === 'C' ? 'badge-amber' : 'badge-muted'
+            }`} style={{ alignSelf: 'flex-start' }}>
+              Tier {job.tier}
+            </span>
+          )}
+          {job.is_test && <span className="badge badge-red">TEST</span>}
+        </div>
+
+        {columnStatus === 'ready_to_apply' && latestApp && (
+          <div className="job-card-actions" style={{ marginTop: 8 }}>
+            <button
+              className="btn btn-primary btn-xs"
+              style={{ flex: 1 }}
+              onClick={handleApply}
+              disabled={acting}
+            >
+              Apply
+            </button>
+            <button
+              className="btn btn-outline btn-xs"
+              style={{ flex: 1 }}
+              onClick={handlePass}
+              disabled={acting}
+            >
+              Pass
+            </button>
+          </div>
         )}
       </div>
     </Link>
