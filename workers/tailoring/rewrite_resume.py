@@ -33,9 +33,15 @@ TRUTH AND NO-FABRICATION CONSTRAINT (CRITICAL RULE):
 - If the job description requires a technology (e.g. Java, AWS, Kubernetes) that is NOT present in the candidate's profile, DO NOT ADD IT to the tailored resume. Leave it out.
 - Every rewritten bullet point must be factually grounded in the original bullets of the same project.
 
-Resume Overhaul Format:
-- Rewrite the bullet points using the Google XYZ format: "Accomplished X, measured by Y, by doing Z".
+Resume Overhaul Format & Phrasing:
+- Rewrite the bullet points using the Google XYZ structure (accomplishment, measurable outcome, method), but write them in a varied, natural, and professional resume tone.
+- CRITICAL: DO NOT start every bullet with "Accomplished" or use the literal phrases "measured by" or "by doing" in every bullet. Vary the sentence structure and starting action verbs naturally.
 - Keep the number of bullets per project to 2-3.
+
+Few-shot examples of correct, naturally-phrased XYZ bullets (observe how they do NOT repeat the same opening words):
+* "Reduced database query latency by 45% (from 180ms to 99ms) by implementing HNSW index structures and optimizing PostgreSQL query plans."
+* "Shipped 5 production Telegram bots for international clients, achieving a 100% gateway integration success rate through event-driven Python backends."
+* "Eliminated repetitive customer support work for 3+ clients, yielding a 35% ticket deflection rate by building an automated RAG document Q&A chatbot."
 
 Master Resume Profile:
 {json.dumps(resume_profile, indent=2)}
