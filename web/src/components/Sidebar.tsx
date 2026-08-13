@@ -13,23 +13,13 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const navItems = [
     {
       href: '/jobs',
-      label: 'Applications Board',
+      label: 'Tasks',
       icon: (
         <svg className="nav-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <rect x="3" y="3" width="7" height="9" rx="1" />
-          <rect x="14" y="3" width="7" height="5" rx="1" />
-          <rect x="14" y="12" width="7" height="9" rx="1" />
-          <rect x="3" y="16" width="7" height="5" rx="1" />
-        </svg>
-      ),
-    },
-    {
-      href: '/discarded',
-      label: 'Discarded Jobs',
-      icon: (
-        <svg className="nav-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-          <circle cx="12" cy="12" r="10" />
-          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+          <rect x="3" y="4" width="18" height="15" rx="2" ry="2" />
+          <line x1="9" y1="9" x2="15" y2="9" />
+          <line x1="9" y1="13" x2="15" y2="13" />
+          <line x1="9" y1="17" x2="13" y2="17" />
         </svg>
       ),
     },
@@ -41,6 +31,16 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <line x1="18" y1="20" x2="18" y2="10" />
           <line x1="12" y1="20" x2="12" y2="4" />
           <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+      ),
+    },
+    {
+      href: '/discarded',
+      label: 'Discarded',
+      icon: (
+        <svg className="nav-icon-svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
         </svg>
       ),
     },
@@ -58,19 +58,31 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
   return (
     <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
-      <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">JP</div>
-        <span className="sidebar-logo-text">JobPilot</span>
-        <button className="sidebar-close-btn" onClick={onClose}>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 16, height: 16 }}>
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
-        </button>
+      
+      {/* Profile Section (Header) */}
+      <div className="sidebar-profile">
+        <div className="profile-details">
+          <div className="profile-avatar">
+            <span>G</span>
+          </div>
+          <span className="profile-name">Gaurav</span>
+        </div>
+        <svg className="profile-selector" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <polyline points="7 15 12 20 17 15" />
+          <polyline points="7 9 12 4 17 9" />
+        </svg>
       </div>
 
+      {/* Workspace Header Dropdown */}
+      <div className="sidebar-workspace">
+        <span className="workspace-label">Workspace</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="workspace-chevron">
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </div>
+
+      {/* Navigation Links */}
       <nav className="sidebar-nav">
-        <span className="nav-section-label">Navigation</span>
         {navItems.map(({ href, icon, label }) => {
           const isActive = pathname === href || pathname.startsWith(href + '/');
           return (
@@ -81,11 +93,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               onClick={onClose}
             >
               {icon}
-              <span>{label}</span>
+              <span className="nav-label">{label}</span>
             </Link>
           );
         })}
       </nav>
+      
     </aside>
   );
 }
