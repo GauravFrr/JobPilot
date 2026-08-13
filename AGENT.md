@@ -1,5 +1,8 @@
 # AGENT.md — Instructions for Antigravity (JobPilot)
 
+> [!IMPORTANT]
+> **MANDATORY CONTEXT READ FIRST**: Every time the user assigns a task, before making any changes, running any terminal commands, or generating code, the agent MUST first read all relevant design documents, modules specs, plans, and instructions in the `docs/` folder and this `AGENT.md` file. Always cross-reference instructions, variables, paths, and behavioral rules with the original docs rather than proceeding from memory or making assumptions.
+
 This file is the operating manual for whichever agent (Antigravity) is doing the actual build work on JobPilot. Read this before touching code, and re-check it whenever a task feels ambiguous.
 
 ## 1. Doc Suite — Read Order & Authority
