@@ -25,8 +25,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               borderRadius: 'var(--radius)',
               fontSize: '12px',
             },
-            success: { iconTheme: { primary: 'var(--green)', secondary: 'var(--bg-surface)' } },
-            error: { iconTheme: { primary: 'var(--red)', secondary: 'var(--bg-surface)' } },
+            success: {
+              icon: (
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--green)" strokeWidth="3" style={{ width: 14, height: 14 }}>
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              )
+            },
+            error: {
+              icon: (
+                <svg viewBox="0 0 24 24" fill="none" stroke="var(--red)" strokeWidth="3" style={{ width: 14, height: 14 }}>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              )
+            }
           }}
         />
       </body>

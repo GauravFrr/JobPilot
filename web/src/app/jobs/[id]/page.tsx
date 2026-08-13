@@ -18,7 +18,15 @@ export default function JobDetailPage() {
   );
 
   if (isLoading) return <div className="loading-center"><div className="spinner" /></div>;
-  if (!job) return <div className="empty"><div className="empty-icon">🔍</div><div className="empty-title">Job not found</div></div>;
+  if (!job) return (
+    <div className="empty">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 32, height: 32, margin: '0 auto 8px', opacity: 0.5 }}>
+        <circle cx="11" cy="11" r="8" />
+        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+      </svg>
+      <div className="empty-title">Job not found</div>
+    </div>
+  );
 
   const latestApp = job.applications?.[0];
   const latestResume = job.resume_versions?.[0];
@@ -79,18 +87,30 @@ export default function JobDetailPage() {
           </div>
           <div className="flex gap-2">
             {job.url && (
-              <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm">
-                🔗 View Listing
+              <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm" style={{ gap: 6 }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 12, height: 12 }}>
+                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                  <polyline points="15 3 21 3 21 9" />
+                  <line x1="10" y1="14" x2="21" y2="3" />
+                </svg>
+                <span>View Listing</span>
               </a>
             )}
             {latestApp?.status === 'ready_to_apply' && (
-              <button className="btn btn-primary btn-sm" onClick={handleMarkApplied} disabled={acting}>
-                ✅ Mark Applied
+              <button className="btn btn-primary btn-sm" onClick={handleMarkApplied} disabled={acting} style={{ gap: 6 }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12 }}>
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+                <span>Mark Applied</span>
               </button>
             )}
             {latestApp?.status && !['applied', 'discarded', 'skipped'].includes(latestApp.status) && (
-              <button className="btn btn-outline btn-sm" onClick={handlePass} disabled={acting}>
-                🚫 Pass
+              <button className="btn btn-outline btn-sm" onClick={handlePass} disabled={acting} style={{ gap: 6 }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12 }}>
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+                <span>Pass</span>
               </button>
             )}
           </div>
@@ -229,7 +249,10 @@ export default function JobDetailPage() {
             </>
           ) : (
             <div className="empty">
-              <div className="empty-icon">📄</div>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 32, height: 32, margin: '0 auto 8px', opacity: 0.5 }}>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <polyline points="14 2 14 8 20 8" />
+              </svg>
               <div className="empty-title">No tailored resume yet</div>
               <div className="empty-sub">Resume will appear here once the tailoring step completes</div>
             </div>
@@ -242,7 +265,10 @@ export default function JobDetailPage() {
         <div className="flex flex-col gap-4">
           {(job.contacts ?? []).length === 0 ? (
             <div className="empty">
-              <div className="empty-icon">👤</div>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 32, height: 32, margin: '0 auto 8px', opacity: 0.5 }}>
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
               <div className="empty-title">No contacts found</div>
               <div className="empty-sub">Scraper did not detect high-probability public team members for this listing.</div>
             </div>
@@ -408,7 +434,10 @@ export default function JobDetailPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           {(job.outreach_drafts ?? []).length === 0 ? (
             <div className="empty">
-              <div className="empty-icon">📨</div>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 32, height: 32, margin: '0 auto 8px', opacity: 0.5 }}>
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                <polyline points="22,6 12,13 2,6" />
+              </svg>
               <div className="empty-title">No outreach drafts</div>
               <div className="empty-sub">LinkedIn / cold email drafts will appear here</div>
             </div>
@@ -419,8 +448,8 @@ export default function JobDetailPage() {
                   <div className="flex gap-2 items-center">
                     <span className="badge badge-muted">{d.channel}</span>
                     {d.sent
-                      ? <span className="badge badge-green">✅ Sent</span>
-                      : <span className="badge badge-amber">⏳ Draft</span>
+                      ? <span className="badge badge-green">Sent</span>
+                      : <span className="badge badge-amber">Draft</span>
                     }
                   </div>
                   <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
