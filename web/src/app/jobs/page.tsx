@@ -199,6 +199,12 @@ export default function JobsPage() {
                           Tier {job.tier}
                         </span>
                       )}
+                      {job.contacts && job.contacts.length > 0 && (
+                        <span className="badge badge-muted" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--bg-surface)', color: 'var(--text-primary)' }}>
+                          <span>👤</span>
+                          <span>{job.contacts[0].name}</span>
+                        </span>
+                      )}
                       {job.is_test && <span className="badge badge-red" style={{ fontSize: '9px', padding: '1px 5px' }}>TEST</span>}
                     </div>
                     
@@ -248,6 +254,20 @@ export default function JobsPage() {
                         onClick={(e) => handlePass(e, job.id, latestApp.id)}
                       >
                         Pass Role
+                      </button>
+                    )}
+
+                    {job.contacts && job.contacts.length > 0 && (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        style={{ borderRadius: '9999px', fontSize: '11px', padding: '5px 12px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          window.location.href = `/jobs/${job.id}?tab=contact`;
+                        }}
+                      >
+                        ✉️ Message Contact
                       </button>
                     )}
 

@@ -11,7 +11,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 from app.db import get_db
 from app.models.jobs import JobRaw
 from app.models.contacts import Contact
-from app.models.resumes import ResumeProfile
+from app.models.resumes import ResumeProfile, ResumeVersion
 from app.models.outreach import OutreachDraft
 from workers.llm.provider import generate
 
@@ -22,7 +22,7 @@ router = APIRouter(
     tags=["outreach"]
 )
 
-@router.post("/{job_id}/draft")
+@router.post("/{job_id}/draft", status_code=status.HTTP_201_CREATED)
 async def generate_outreach_draft(
     job_id: str,
     payload: Dict[str, str],
@@ -33,6 +33,13 @@ async def generate_outreach_draft(
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid channel. Must be 'linkedin' or 'email'."
+        )
+        
+    tone = payload.get("tone", "confident").lower()
+    if tone not in ["confident", "warm"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid tone. Must be 'confident' or 'warm'."
         )
         
     # Check contact exists
@@ -65,13 +72,32 @@ async def generate_outreach_draft(
             detail="No active resume profile found."
         )
         
+    # Fetch tailored accomplishments if they exist (ResumeVersion)
+    stmt_rv = select(ResumeVersion).where(ResumeVersion.job_id == job_id).order_by(ResumeVersion.generated_at.desc())
+    rv_res = await db.execute(stmt_rv)
+    rv = rv_res.scalars().first()
+    
+    accomplishments_source = rv.content_json if (rv and rv.content_json) else profile.content_json
+    
+    tone_instructions = ""
+    if tone == "confident":
+        tone_instructions = (
+            "Write in a direct, professional, and confident tone. Focus on specific hard-hitting accomplishments "
+            "and metrics from the profile. Sound capable, proactive, and ready to add value immediately."
+        )
+    else:  # warm
+        tone_instructions = (
+            "Write in a warm, collaborative, and curious tone. Focus on showing genuine interest in the team's engineering "
+            "challenges and express curiosity about the specific projects they are working on, while maintaining professionalism."
+        )
+
     # Construct generation prompt
     prompt = f"""
 You are an outreach assistant helping Gaurav draft a personalized cold outreach message to a hiring contact.
 The message must be professional, brief, and highly customized to both the job and the contact's background.
 
-Master Profile of Gaurav:
-{profile.content_json}
+Gaurav's Resume Accomplishments Reference:
+{accomplishments_source}
 
 Job Listing details:
 Company: {job.company}
@@ -84,14 +110,17 @@ Title: {contact.title}
 
 Channel: {channel.upper()} (LinkedIn or Email)
 
-Instructions:
+Outreach Tone & Style Instructions:
+{tone_instructions}
+
+General Instructions:
 1. Write a cold outreach message targeting this contact.
 2. If the channel is Email, include a Subject line at the beginning. If it is LinkedIn, make it fit within 300 characters (or a short note format).
-3. Do NOT make up any details or credentials that are not present in Gaurav's Master Profile (TRD REQ-GEN-1). Keep it strictly factual.
+3. Do NOT make up any details or credentials that are not present in Gaurav's Master Profile/Resume. Keep it strictly factual.
 4. Use standard past-tense verbs for accomplishments (e.g., Developed, Built, Led).
 5. Output ONLY the raw drafted message content, without conversational preamble or formatting indicators.
 """
-    logger.info(f"Generating outreach draft for job {job_id} using model provider...")
+    logger.info(f"Generating outreach draft for job {job_id} using model provider (channel: {channel}, tone: {tone})...")
     try:
         draft_text = await generate(prompt, "outreach_draft", "premium")
         
@@ -135,5 +164,11 @@ async def update_outreach_sent(
         )
         
     od.sent = sent
+    from sqlalchemy.sql import func
+    if sent:
+        od.sent_at = func.now()
+    else:
+        od.sent_at = None
+        
     await db.commit()
     return {"status": "success", "sent": od.sent}

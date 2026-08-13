@@ -29,6 +29,7 @@ from workers.tailoring.render_pdf import render_resume_to_pdf
 
 # Import applying components
 from workers.applying.tier_a_apply import pre_build_application_payload
+from workers.contacts.find_contacts import run_contact_finder_for_job
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("workers.scheduler")
@@ -144,14 +145,23 @@ async def process_new_jobs_pipeline():
             logger.error("No active profile, skipping tailoring.")
             return
             
+        tailor_tasks = []
         for job_id in matched_job_ids:
             stmt = select(JobRaw).where(JobRaw.id == job_id)
             result = await session.execute(stmt)
             job = result.scalars().first()
             if job:
-                success = await run_tailoring_pipeline(session, job, profile)
-                if success:
-                    tailored_job_ids.append(job_id)
+                # 1. Run contact finder in the background (non-blocking, parallel)
+                logger.info(f"Triggering parallel contact finder worker for matched job {job.id}")
+                asyncio.create_task(run_contact_finder_for_job(str(job.id)))
+                
+                # 2. Run tailoring pipeline
+                tailor_tasks.append((job, run_tailoring_pipeline(session, job, profile)))
+                
+        for job, task in tailor_tasks:
+            success = await task
+            if success:
+                tailored_job_ids.append(job.id)
 
     # 5. Pre-build application payloads
     for job_id in tailored_job_ids:

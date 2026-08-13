@@ -41,3 +41,15 @@ class DBApplication(Base):
     resume_version_id = Column(UUID(as_uuid=True), ForeignKey("resume_versions.id"), nullable=True)
     status = Column(String, nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=True)
+
+class DBContact(Base):
+    __tablename__ = "contacts"
+    id = Column(UUID(as_uuid=True), primary_key=True)
+    job_id = Column(UUID(as_uuid=True), ForeignKey("jobs_raw.id"), nullable=False)
+    name = Column(String, nullable=True)
+    title = Column(String, nullable=True)
+    company = Column(String, nullable=True)
+    linkedin_url = Column(String, nullable=True)
+    email = Column(String, nullable=True)
+    email_confidence = Column(String, nullable=True)
+    evidence = Column(JSONB, nullable=True)

@@ -96,10 +96,11 @@ async def list_jobs(
         rv_res = await db.execute(rv_stmt)
         has_rv = rv_res.scalars().first() is not None
         
-        # Check has_contact
+        # Check has_contact and load contact list
         c_stmt = select(Contact).where(Contact.job_id == job.id)
         c_res = await db.execute(c_stmt)
-        has_c = c_res.scalars().first() is not None
+        c_list = c_res.scalars().all()
+        has_c = len(c_list) > 0
         
         # Load application_id if status matches applied/ready_to_apply
         app_stmt = select(Application).where(Application.job_id == job.id)
@@ -126,7 +127,16 @@ async def list_jobs(
             # Stub arrays — full arrays only in GET /jobs/{id}
             "resume_versions": [],
             "applications": [{"id": app_id, "status": app_rec.status, "method": app_rec.method, "applied_at": app_rec.applied_at.isoformat() if app_rec and app_rec.applied_at else None}] if app_rec else [],
-            "contacts": [],
+            "contacts": [
+                {
+                    "id": str(c.id),
+                    "name": c.name,
+                    "title": c.title,
+                    "linkedin_url": c.linkedin_url,
+                    "email": c.email,
+                    "email_confidence": c.email_confidence
+                } for c in c_list
+            ],
             "outreach_drafts": [],
         })
         

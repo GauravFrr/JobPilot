@@ -137,3 +137,41 @@ async def handle_pass_callback(callback: types.CallbackQuery):
     except Exception as e:
         logger.error(f"Error calling pass endpoint: {str(e)}")
         await callback.message.edit_text(f"❌ Error: `{str(e)}`")
+
+
+@router.callback_query(F.data.startswith("draft:"))
+async def handle_draft_callback(callback: types.CallbackQuery):
+    chat_id = callback.message.chat.id
+    if not await check_auth(chat_id):
+        await callback.answer("Unauthorized.", show_alert=True)
+        return
+
+    job_id = callback.data.split(":")[1]
+    await callback.answer("Generating outreach draft…")
+
+    api_url = f"http://api:8000/api/v1/outreach/{job_id}/draft"
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                api_url,
+                json={"channel": "linkedin", "tone": "confident"},
+                timeout=30
+            )
+
+        if response.status_code in (200, 201):
+            data = response.json()
+            draft_text = data.get("draft_text", "")
+            reply_text = (
+                f"✉️ **LinkedIn Outreach Draft**\n\n"
+                f"`{draft_text}`\n\n"
+                f"_Copy the draft above and send it manually via LinkedIn._"
+            )
+            await callback.message.answer(reply_text, parse_mode="Markdown")
+        else:
+            await callback.message.answer(
+                f"❌ Failed to generate outreach draft (HTTP {response.status_code})."
+            )
+    except Exception as e:
+        logger.error(f"Error calling outreach draft endpoint for job {job_id}: {str(e)}")
+        await callback.message.answer(f"❌ Error generating draft: `{str(e)}`")
+

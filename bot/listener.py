@@ -5,7 +5,7 @@ from aiogram import Bot
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy import select
 
-from db import AsyncSessionLocal, DBSetting, DBJobRaw, DBJobScore, DBApplication
+from db import AsyncSessionLocal, DBSetting, DBJobRaw, DBJobScore, DBApplication, DBContact
 from config import settings
 
 logger = logging.getLogger("bot.listener")
@@ -56,7 +56,7 @@ async def start_event_listener(bot: Bot):
                 if event_type == "job.ready_to_apply":
                     app_id = payload.get("application_id")
                     
-                    # Fetch job details
+                    # Fetch job details and contacts
                     async with AsyncSessionLocal() as session:
                         stmt = (
                             select(DBJobRaw, DBJobScore)
@@ -65,6 +65,11 @@ async def start_event_listener(bot: Bot):
                         )
                         res = await session.execute(stmt)
                         row = res.first()
+                        
+                        # Fetch contacts
+                        c_stmt = select(DBContact).where(DBContact.job_id == job_id)
+                        c_res = await session.execute(c_stmt)
+                        contacts = c_res.scalars().all()
                         
                     if not row:
                         logger.error(f"Job {job_id} not found in DB. Skipping notification.")
@@ -80,15 +85,67 @@ async def start_event_listener(bot: Bot):
                         f"🎯 Match Score: `{score_val:.1f}%` ({job.source})\n"
                     )
                     
+                    # Include contact info if found
+                    if contacts:
+                        c = contacts[0]
+                        text += (
+                            f"\n👤 **Contact:** {c.name} ({c.title})\n"
+                            f"📧 Email: `{c.email}`\n"
+                            f"🔗 [LinkedIn Profile]({c.linkedin_url})\n"
+                        )
+                    
                     # Keyboard
                     builder = InlineKeyboardBuilder()
                     builder.button(text="✅ Apply", callback_data=f"apply:{app_id}")
                     builder.button(text="🚫 Pass", callback_data=f"pass:{app_id}")
                     builder.button(text="🌐 View", url=f"http://127.0.0.1:3000/applications/{app_id}")
+                    if contacts:
+                        builder.button(text="✉️ Draft Message", callback_data=f"draft:{job_id}")
                     builder.adjust(2)
                     
-                    await bot.send_message(chat_id, text, reply_markup=builder.as_markup())
+                    await bot.send_message(chat_id, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
                     
+                elif event_type == "contact.found":
+                    contact_id = payload.get("contact_id")
+                    name = payload.get("name")
+                    title = payload.get("title")
+                    email = payload.get("email")
+                    linkedin_url = payload.get("linkedin_url")
+                    
+                    async with AsyncSessionLocal() as session:
+                        stmt = select(DBJobRaw).where(DBJobRaw.id == job_id)
+                        res = await session.execute(stmt)
+                        job = res.scalars().first()
+                        
+                        c_stmt = select(DBContact).where(DBContact.id == contact_id)
+                        c_res = await session.execute(c_stmt)
+                        db_contact = c_res.scalars().first()
+                        
+                    if job and db_contact:
+                        evidence_list = db_contact.evidence or []
+                        evidence_str = ""
+                        for ev in evidence_list[:2]:
+                            field = ev.get("field", "info")
+                            snippet = ev.get("snippet", "")
+                            evidence_str += f"• *{field.title()}*: \"{snippet[:85]}...\"\n"
+                            
+                        text = (
+                            f"👤 **Recruiter Contact Found! (Post-hoc)**\n\n"
+                            f"🏢 Company: **{job.company}**\n"
+                            f"💼 Role: **{job.title}**\n\n"
+                            f"🗣️ **{name}**\n"
+                            f"📌 {title}\n"
+                            f"📧 Email: `{email}`\n"
+                            f"🔗 [LinkedIn Profile]({linkedin_url})\n\n"
+                            f"🔍 **Evidence Trace:**\n{evidence_str}"
+                        )
+                        
+                        builder = InlineKeyboardBuilder()
+                        builder.button(text="✉️ Draft Message", callback_data=f"draft:{job_id}")
+                        builder.adjust(1)
+                        
+                        await bot.send_message(chat_id, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+                        
                 elif event_type == "job.applied":
                     app_id = payload.get("application_id")
                     async with AsyncSessionLocal() as session:
