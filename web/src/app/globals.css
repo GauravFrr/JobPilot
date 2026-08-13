@@ -45,10 +45,9 @@
   --font-mono:      'JetBrains Mono', monospace;
 }
 
-/* ─── Dark Mode (System preference) ──────────────────────────────────────── */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg-base:        #000000;
+/* ─── Dark Mode (Manual or System Preference Toggle) ──────────────────────── */
+html[data-theme='dark'] {
+  --bg-base:        #000000;
     --bg-surface:     #161616;
     --bg-card:        #161616;
     --bg-elevated:    #222222;
@@ -82,7 +81,6 @@
     --red-soft:       rgba(224,87,74,0.1);
     --grey-status:     #AAAAAA;
     --grey-soft:      rgba(170,170,170,0.1);
-  }
 }
 
 /* ─── Reset ─────────────────────────────────────────────────────────────── */
