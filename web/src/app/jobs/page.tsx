@@ -1,17 +1,16 @@
 'use client';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 import { useState } from 'react';
 import Link from 'next/link';
-import { getJobs, type Job, type JobStatus, applyApplication, passApplication } from '@/lib/api';
+import { getJobs, type Job, type JobStatus, passApplication, markApplied } from '@/lib/api';
 import toast from 'react-hot-toast';
-import { mutate } from 'swr';
 
-const COLUMNS: { status: JobStatus; label: string; color: string }[] = [
-  { status: 'matched',       label: 'Matched',       color: 'var(--accent)' },
-  { status: 'tailoring',     label: 'Tailoring',     color: 'var(--blue)' },
-  { status: 'ready_to_apply', label: 'Ready',        color: 'var(--amber)' },
-  { status: 'applying',      label: 'Applying',      color: 'var(--amber)' },
-  { status: 'applied',       label: 'Applied',       color: 'var(--green)' },
+const STATUSES: { status: JobStatus; label: string; color: string }[] = [
+  { status: 'matched',        label: 'Matched',        color: 'var(--text-secondary)' },
+  { status: 'tailoring',      label: 'Tailoring',      color: 'var(--blue)' },
+  { status: 'ready_to_apply',  label: 'Ready to Apply', color: 'var(--amber)' },
+  { status: 'applying',       label: 'Applying',       color: 'var(--amber)' },
+  { status: 'applied',        label: 'Applied',        color: 'var(--green)' },
 ];
 
 function scoreColor(score: number | null) {
@@ -21,283 +20,261 @@ function scoreColor(score: number | null) {
   return 'var(--red)';
 }
 
-function jobFetcher([, status]: [string, string]) {
-  return getJobs({ status, per_page: 50 });
-}
+export default function JobsPage() {
+  const [activeStatus, setActiveStatus] = useState<JobStatus>('matched');
+  const [actingId, setActingId] = useState<string | null>(null);
 
-function KanbanColumn({ status, label, color }: { status: JobStatus; label: string; color: string }) {
-  const { data, isLoading } = useSWR([`/jobs`, status], jobFetcher, { refreshInterval: 20000 });
-  const jobs = data?.items ?? [];
+  // Fetch all statuses in parallel to get live counts in pills
+  const { data: matchedData, mutate: mutateMatched } = useSWR(['/jobs', 'matched'], () => getJobs({ status: 'matched', per_page: 100 }), { refreshInterval: 15000 });
+  const { data: tailoringData, mutate: mutateTailoring } = useSWR(['/jobs', 'tailoring'], () => getJobs({ status: 'tailoring', per_page: 100 }), { refreshInterval: 15000 });
+  const { data: readyData, mutate: mutateReady } = useSWR(['/jobs', 'ready_to_apply'], () => getJobs({ status: 'ready_to_apply', per_page: 100 }), { refreshInterval: 15000 });
+  const { data: applyingData, mutate: mutateApplying } = useSWR(['/jobs', 'applying'], () => getJobs({ status: 'applying', per_page: 100 }), { refreshInterval: 15000 });
+  const { data: appliedData, mutate: mutateApplied } = useSWR(['/jobs', 'applied'], () => getJobs({ status: 'applied', per_page: 100 }), { refreshInterval: 15000 });
 
-  return (
-    <div className="kanban-col">
-      <div className="kanban-col-header">
-        <span className="kanban-col-title" style={{ color }}>{label}</span>
-        <span className="kanban-count">{isLoading ? '…' : jobs.length}</span>
-      </div>
-      {isLoading && (
-        <div style={{ padding: '20px', textAlign: 'center' }}>
-          <div className="spinner" style={{ margin: '0 auto', width: 20, height: 20, borderWidth: 2 }} />
-        </div>
-      )}
-      {jobs.map((job) => (
-        <JobKanbanCard key={job.id} job={job} columnStatus={status} />
-      ))}
-      {!isLoading && jobs.length === 0 && (
-        <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: 12 }}>
-          Empty
-        </div>
-      )}
-    </div>
-  );
-}
-
-function JobKanbanCard({ job, columnStatus }: { job: Job; columnStatus: JobStatus }) {
-  const [acting, setActing] = useState(false);
-  const latestApp = job.applications?.[0];
-
-  async function handleApply(e: React.MouseEvent) {
-    e.preventDefault();
-    if (!latestApp) return;
-    setActing(true);
-    try {
-      await applyApplication(latestApp.id);
-      toast.success('Applying...');
-      mutate([`/jobs`, columnStatus]);
-      mutate([`/jobs`, 'applying']);
-    } catch (err: any) {
-      toast.error(err.message || 'Apply failed');
-    } finally {
-      setActing(false);
+  const getJobsList = () => {
+    switch (activeStatus) {
+      case 'matched': return matchedData?.items ?? [];
+      case 'tailoring': return tailoringData?.items ?? [];
+      case 'ready_to_apply': return readyData?.items ?? [];
+      case 'applying': return applyingData?.items ?? [];
+      case 'applied': return appliedData?.items ?? [];
+      default: return [];
     }
-  }
+  };
 
-  async function handlePass(e: React.MouseEvent) {
+  const getCount = (status: JobStatus) => {
+    switch (status) {
+      case 'matched': return matchedData?.total ?? 0;
+      case 'tailoring': return tailoringData?.total ?? 0;
+      case 'ready_to_apply': return readyData?.total ?? 0;
+      case 'applying': return applyingData?.total ?? 0;
+      case 'applied': return appliedData?.total ?? 0;
+      default: return 0;
+    }
+  };
+
+  const forceMutateAll = () => {
+    mutateMatched();
+    mutateTailoring();
+    mutateReady();
+    mutateApplying();
+    mutateApplied();
+  };
+
+  async function handlePass(e: React.MouseEvent, jobId: string, appId: string) {
     e.preventDefault();
-    if (!latestApp) return;
-    setActing(true);
+    e.stopPropagation();
+    setActingId(jobId);
     try {
-      await passApplication(latestApp.id);
-      toast.success('Passed');
-      mutate([`/jobs`, columnStatus]);
+      await passApplication(appId);
+      toast.success('Job passed');
+      forceMutateAll();
     } catch (err: any) {
       toast.error(err.message || 'Pass failed');
     } finally {
-      setActing(false);
+      setActingId(null);
     }
   }
 
-  return (
-    <Link href={`/jobs/${job.id}`}>
-      <div className="job-card">
-        <div className="job-card-title truncate">{job.title}</div>
-        <div className="job-card-company truncate">{job.company}</div>
-        <div className="job-card-meta">
-          <span
-            className="badge"
-            style={{
-              background: 'var(--bg-surface)',
-              color: scoreColor(job.match_score),
-              fontFamily: 'var(--font-mono)',
-            }}
-          >
-            {job.match_score != null ? `${job.match_score.toFixed(0)}%` : '—'}
-          </span>
-          <span className="badge badge-muted">{job.source}</span>
-        </div>
-        
-        <div className="flex justify-between items-center" style={{ marginTop: 4 }}>
-          {job.tier && (
-            <span className={`badge ${
-              job.tier === 'A' ? 'badge-green' :
-              job.tier === 'B' ? 'badge-blue' :
-              job.tier === 'C' ? 'badge-amber' : 'badge-muted'
-            }`} style={{ alignSelf: 'flex-start' }}>
-              Tier {job.tier}
-            </span>
-          )}
-          {job.is_test && <span className="badge badge-red">TEST</span>}
-        </div>
-
-        {columnStatus === 'ready_to_apply' && latestApp && (
-          <div className="job-card-actions" style={{ marginTop: 8 }}>
-            <button
-              className="btn btn-primary btn-xs"
-              style={{ flex: 1 }}
-              onClick={handleApply}
-              disabled={acting}
-            >
-              Apply
-            </button>
-            <button
-              className="btn btn-outline btn-xs"
-              style={{ flex: 1 }}
-              onClick={handlePass}
-              disabled={acting}
-            >
-              Pass
-            </button>
-          </div>
-        )}
-      </div>
-    </Link>
-  );
-}
-
-// ─── Table View ──────────────────────────────────────────────────────────────
-
-function TableView({ source, status }: { source: string; status: string }) {
-  const params: Record<string, string> = { per_page: '100' };
-  if (source) params.source = source;
-  if (status) params.status = status;
-
-  const { data, isLoading } = useSWR(
-    ['/jobs/table', source, status],
-    () => getJobs(params),
-    { refreshInterval: 20000 }
-  );
-
-  const jobs = data?.items ?? [];
-
-  if (isLoading) return <div className="loading-center"><div className="spinner" /></div>;
-
-  if (!jobs.length) {
-    return (
-      <div className="empty">
-        <div className="empty-icon">🗂️</div>
-        <div className="empty-title">No applications found</div>
-        <div className="empty-sub">Adjust the filters or wait for new jobs to come in</div>
-      </div>
-    );
+  async function handleMarkApplied(e: React.MouseEvent, jobId: string, appId: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    setActingId(jobId);
+    try {
+      await markApplied(appId);
+      toast.success('Marked as applied');
+      forceMutateAll();
+    } catch (err: any) {
+      toast.error(err.message || 'Action failed');
+    } finally {
+      setActingId(null);
+    }
   }
 
-  return (
-    <div className="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Role</th>
-            <th>Company</th>
-            <th>Source</th>
-            <th>Tier</th>
-            <th>Score</th>
-            <th>Status</th>
-            <th>Applied</th>
-          </tr>
-        </thead>
-        <tbody>
-          {jobs.map((job) => (
-            <Link key={job.id} href={`/jobs/${job.id}`} legacyBehavior>
-              <tr>
-                <td style={{ color: 'var(--text-primary)', fontWeight: 600, maxWidth: 220 }} className="truncate">
-                  {job.title}
-                </td>
-                <td className="truncate" style={{ maxWidth: 160 }}>{job.company}</td>
-                <td><span className="badge badge-muted">{job.source}</span></td>
-                <td>
-                  {job.tier ? (
-                    <span className={`badge ${
-                      job.tier === 'A' ? 'badge-green' :
-                      job.tier === 'B' ? 'badge-blue' :
-                      job.tier === 'C' ? 'badge-amber' : 'badge-muted'
-                    }`}>T{job.tier}</span>
-                  ) : '—'}
-                </td>
-                <td style={{ fontFamily: 'var(--font-mono)', fontWeight: 700, color: scoreColor(job.match_score) }}>
-                  {job.match_score != null ? `${job.match_score.toFixed(0)}%` : '—'}
-                </td>
-                <td>
-                  <StatusBadge status={job.status} />
-                </td>
-                <td style={{ fontSize: 12 }}>
-                  {job.applied_at ? new Date(job.applied_at).toLocaleDateString() : '—'}
-                </td>
-              </tr>
-            </Link>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function StatusBadge({ status }: { status: JobStatus }) {
-  const map: Record<string, string> = {
-    matched: 'badge-purple',
-    tailoring: 'badge-blue',
-    ready_to_apply: 'badge-amber',
-    applying: 'badge-amber',
-    applied: 'badge-green',
-    discarded: 'badge-red',
-    discovered: 'badge-muted',
-  };
-  return <span className={`badge ${map[status] ?? 'badge-muted'}`}>{status.replace(/_/g, ' ')}</span>;
-}
-
-// ─── Main Page ──────────────────────────────────────────────────────────────
-
-export default function JobsPage() {
-  const [view, setView] = useState<'board' | 'table'>('board');
-  const [filterSource, setFilterSource] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  const jobsList = getJobsList();
 
   return (
     <>
-      <div className="page-header flex justify-between items-center">
-        <div>
-          <h1 className="page-title">Applications Board</h1>
-          <p className="page-subtitle">All jobs in your pipeline</p>
-        </div>
-        <div className="tabs">
-          <button className={`tab${view === 'board' ? ' active' : ''}`} onClick={() => setView('board')}>
-            Board
-          </button>
-          <button className={`tab${view === 'table' ? ' active' : ''}`} onClick={() => setView('table')}>
-            Table
-          </button>
-        </div>
+      {/* Header */}
+      <div className="page-header">
+        <h1 className="page-title">Applications Board</h1>
+        <p className="page-subtitle">Manage your jobs pipeline in full-width list view</p>
       </div>
 
-      {view === 'table' && (
-        <div className="filters-bar">
-          <select
-            className="input"
-            style={{ width: 'auto' }}
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="">All statuses</option>
-            {COLUMNS.map((c) => (
-              <option key={c.status} value={c.status}>{c.label}</option>
-            ))}
-          </select>
-          <select
-            className="input"
-            style={{ width: 'auto' }}
-            value={filterSource}
-            onChange={(e) => setFilterSource(e.target.value)}
-          >
-            <option value="">All sources</option>
-            <option value="remoteok">RemoteOK</option>
-            <option value="wwr">We Work Remotely</option>
-            <option value="greenhouse">Greenhouse</option>
-            <option value="lever">Lever</option>
-            <option value="linkedin">LinkedIn</option>
-          </select>
-        </div>
-      )}
+      {/* Row of Category Filter Pills */}
+      <div style={{
+        display: 'flex',
+        flexWrap: 'wrap',
+        gap: 10,
+        marginBottom: 20,
+        paddingBottom: 14,
+        borderBottom: '1px solid var(--border)'
+      }}>
+        {STATUSES.map(({ status, label, color }) => {
+          const isActive = activeStatus === status;
+          const count = getCount(status);
+          return (
+            <button
+              key={status}
+              onClick={() => setActiveStatus(status)}
+              className="flex items-center gap-2"
+              style={{
+                background: isActive ? 'var(--text-primary)' : 'var(--bg-card)',
+                color: isActive ? 'var(--bg-base)' : 'var(--text-primary)',
+                border: '1px solid var(--border)',
+                borderRadius: '9999px',
+                padding: '6px 16px',
+                fontSize: '12px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                transition: 'all 0.1s ease',
+                outline: 'none'
+              }}
+            >
+              <span style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                backgroundColor: isActive ? 'var(--bg-base)' : color
+              }} />
+              <span>{label}</span>
+              <span style={{
+                opacity: 0.6,
+                fontSize: '10px',
+                fontFamily: 'var(--font-mono)',
+                backgroundColor: isActive ? 'rgba(0,0,0,0.1)' : 'var(--bg-elevated)',
+                padding: '1px 6px',
+                borderRadius: '9999px',
+                color: isActive ? 'var(--bg-base)' : 'var(--text-secondary)'
+              }}>
+                {count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
 
-      {view === 'board' ? (
-        <div className="kanban-wrapper">
-          <div className="kanban-board">
-            {COLUMNS.map((col) => (
-              <KanbanColumn key={col.status} {...col} />
-            ))}
+      {/* Main Full-Width Jobs List */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {jobsList.length === 0 ? (
+          <div className="card flex flex-col items-center justify-center" style={{ padding: '60px 20px', textAlign: 'center' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 32, height: 32, color: 'var(--text-muted)', marginBottom: 12 }}>
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>No jobs found</div>
+            <p style={{ fontSize: 12, color: 'var(--text-secondary)', marginTop: 4 }}>
+              There are no jobs in the "{STATUSES.find(s => s.status === activeStatus)?.label}" pipeline stage.
+            </p>
           </div>
-        </div>
-      ) : (
-        <TableView source={filterSource} status={filterStatus} />
-      )}
+        ) : (
+          jobsList.map((job) => {
+            const latestApp = job.applications?.[0];
+            return (
+              <Link href={`/jobs/${job.id}`} key={job.id}>
+                <div className="card" style={{
+                  padding: '14px 20px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: 16,
+                  cursor: 'pointer'
+                }}>
+                  {/* Left part: Title & metadata */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <h2 className="truncate" style={{ fontSize: 15, fontWeight: 700, color: 'var(--text-primary)', margin: 0, maxWidth: '400px' }}>
+                        {job.title}
+                      </h2>
+                      <span className="badge font-mono font-bold" style={{ background: 'var(--bg-surface)', color: scoreColor(job.match_score) }}>
+                        {job.match_score != null ? `${job.match_score.toFixed(1)}%` : '—'}
+                      </span>
+                      {job.tier && (
+                        <span className={`badge ${
+                          job.tier === 'A' ? 'badge-green' :
+                          job.tier === 'B' ? 'badge-blue' :
+                          job.tier === 'C' ? 'badge-amber' : 'badge-muted'
+                        }`}>
+                          Tier {job.tier}
+                        </span>
+                      )}
+                      {job.is_test && <span className="badge badge-red" style={{ fontSize: '9px', padding: '1px 5px' }}>TEST</span>}
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--text-secondary)' }}>
+                      <span style={{ fontWeight: 600 }}>{job.company}</span>
+                      <span>·</span>
+                      <span>{job.source}</span>
+                      {job.created_at && (
+                        <>
+                          <span>·</span>
+                          <span style={{ color: 'var(--text-muted)' }}>Discovered {new Date(job.created_at).toLocaleDateString()}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right part: Actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }} onClick={(e) => e.stopPropagation()}>
+                    
+                    {/* Action buttons based on activeStatus */}
+                    {activeStatus === 'ready_to_apply' && latestApp && (
+                      <>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          style={{ borderRadius: '9999px', fontSize: '11px', padding: '5px 12px' }}
+                          disabled={actingId === job.id}
+                          onClick={(e) => handleMarkApplied(e, job.id, latestApp.id)}
+                        >
+                          Mark Applied
+                        </button>
+                        <button
+                          className="btn btn-outline btn-sm"
+                          style={{ borderRadius: '9999px', fontSize: '11px', padding: '5px 12px' }}
+                          disabled={actingId === job.id}
+                          onClick={(e) => handlePass(e, job.id, latestApp.id)}
+                        >
+                          Pass
+                        </button>
+                      </>
+                    )}
+
+                    {activeStatus === 'matched' && latestApp && (
+                      <button
+                        className="btn btn-outline btn-sm"
+                        style={{ borderRadius: '9999px', fontSize: '11px', padding: '5px 12px' }}
+                        disabled={actingId === job.id}
+                        onClick={(e) => handlePass(e, job.id, latestApp.id)}
+                      >
+                        Pass Role
+                      </button>
+                    )}
+
+                    {/* View Original Listing external link */}
+                    {job.url && (
+                      <a
+                        href={job.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-outline btn-sm"
+                        style={{ borderRadius: '9999px', fontSize: '11px', padding: '5px 10px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <span>Original</span>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 10, height: 10 }}>
+                          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                          <polyline points="15 3 21 3 21 9" />
+                          <line x1="10" y1="14" x2="21" y2="3" />
+                        </svg>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            );
+          })
+        )}
+      </div>
     </>
   );
 }
