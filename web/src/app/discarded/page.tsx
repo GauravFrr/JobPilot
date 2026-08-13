@@ -25,7 +25,6 @@ export default function DiscardedPage() {
         <div className="loading-center"><div className="spinner" /></div>
       ) : jobs.length === 0 ? (
         <div className="empty">
-          <div className="empty-icon">🎉</div>
           <div className="empty-title">No discarded jobs</div>
           <div className="empty-sub">All jobs passing the threshold will be shown in the Applications Board</div>
         </div>

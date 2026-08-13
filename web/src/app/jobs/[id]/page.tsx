@@ -141,7 +141,7 @@ export default function JobDetailPage() {
           )}
 
           {job.is_test && (
-            <span className="badge badge-red">🧪 TEST</span>
+            <span className="badge badge-red">TEST</span>
           )}
         </div>
       </div>
@@ -154,12 +154,12 @@ export default function JobDetailPage() {
             className={`tab${activeTab === t ? ' active' : ''}`}
             onClick={() => setActiveTab(t)}
           >
-            {t === 'overview' && '📋 Overview'}
-            {t === 'resume'   && '📄 Resume'}
-            {t === 'contact'  && '👤 Contact'}
-            {t === 'match'    && '🎯 Match Details'}
-            {t === 'log'      && '📋 Application Log'}
-            {t === 'outreach' && '📨 Outreach'}
+            {t === 'overview' && 'Overview'}
+            {t === 'resume'   && 'Resume'}
+            {t === 'contact'  && 'Contact'}
+            {t === 'match'    && 'Match Details'}
+            {t === 'log'      && 'Application Log'}
+            {t === 'outreach' && 'Outreach'}
           </button>
         ))}
       </div>

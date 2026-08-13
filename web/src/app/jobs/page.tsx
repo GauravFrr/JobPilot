@@ -250,10 +250,10 @@ export default function JobsPage() {
         </div>
         <div className="tabs">
           <button className={`tab${view === 'board' ? ' active' : ''}`} onClick={() => setView('board')}>
-            🗂 Board
+            Board
           </button>
           <button className={`tab${view === 'table' ? ' active' : ''}`} onClick={() => setView('table')}>
-            📋 Table
+            Table
           </button>
         </div>
       </div>
