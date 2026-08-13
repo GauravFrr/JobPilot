@@ -1,6 +1,6 @@
 'use client';
 import useSWR from 'swr';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import { getJob, passApplication, markApplied, getResumePdfUrl, type Job } from '@/lib/api';
@@ -8,8 +8,8 @@ import { getJob, passApplication, markApplied, getResumePdfUrl, type Job } from 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<'overview' | 'resume' | 'contact' | 'match' | 'log'>('overview');
   const [acting, setActing] = useState(false);
+  const [resumeExpanded, setResumeExpanded] = useState(false);
 
   const { data: job, isLoading, mutate } = useSWR<Job>(
     id ? `/jobs/${id}` : null,
@@ -30,6 +30,7 @@ export default function JobDetailPage() {
 
   const latestApp = job.applications?.[0];
   const latestResume = job.resume_versions?.[0];
+  const scoreDetails = (job as any).score;
 
   async function handlePass() {
     if (!latestApp) return;
@@ -66,379 +67,400 @@ export default function JobDetailPage() {
     return 'var(--red)';
   };
 
-  // Typecast helper for job score details if they exist in full GET detail response
-  const scoreDetails = (job as any).score;
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'applied': return 'var(--green)';
+      case 'ready_to_apply': return 'var(--amber)';
+      case 'applying':
+      case 'tailoring': return 'var(--amber)';
+      case 'discarded':
+      case 'skipped': return 'var(--text-muted)';
+      default: return 'var(--text-muted)';
+    }
+  };
 
   return (
     <>
-      {/* Header */}
-      <div style={{ marginBottom: 20 }}>
+      {/* Back navigation control */}
+      <div style={{ marginBottom: 16 }}>
         <button
-          className="btn btn-outline btn-sm"
-          style={{ marginBottom: 12 }}
+          className="btn btn-outline"
+          style={{ padding: '6px 12px', fontSize: '11px', borderRadius: '9999px', cursor: 'pointer' }}
           onClick={() => router.back()}
         >
-          ← Back
+          ← Back to Board
         </button>
-        <div className="flex justify-between items-center">
+      </div>
+
+      {/* Main Two-Column Layout */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'start' }}>
+        
+        {/* LEFT COLUMN: Main task details, description, history */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          
+          {/* Header Block */}
           <div>
-            <h1 className="page-title">{job.title}</h1>
-            <p className="page-subtitle">{job.company} · {job.source}</p>
+            <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 4 }}>
+              {job.title}
+            </h1>
+            <p style={{ fontSize: 13, color: 'var(--text-secondary)' }}>
+              {job.company} · {job.source}
+            </p>
           </div>
-          <div className="flex gap-2">
-            {job.url && (
-              <a href={job.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-sm" style={{ gap: 6 }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 12, height: 12 }}>
-                  <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                  <polyline points="15 3 21 3 21 9" />
-                  <line x1="10" y1="14" x2="21" y2="3" />
-                </svg>
-                <span>View Listing</span>
-              </a>
-            )}
-            {latestApp?.status === 'ready_to_apply' && (
-              <button className="btn btn-primary btn-sm" onClick={handleMarkApplied} disabled={acting} style={{ gap: 6 }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12 }}>
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-                <span>Mark Applied</span>
-              </button>
-            )}
-            {latestApp?.status && !['applied', 'discarded', 'skipped'].includes(latestApp.status) && (
-              <button className="btn btn-outline btn-sm" onClick={handlePass} disabled={acting} style={{ gap: 6 }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12 }}>
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-                <span>Pass</span>
-              </button>
-            )}
-          </div>
-        </div>
 
-        {/* Score + Status strip */}
-        <div className="flex gap-2 items-center" style={{ marginTop: 12 }}>
+          {/* Properties / Meta Strip */}
           <div style={{
-            background: 'var(--bg-surface)',
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--radius)',
-            padding: '6px 12px',
             display: 'flex',
-            alignItems: 'center',
-            gap: 6,
+            flexWrap: 'wrap',
+            gap: 12,
+            padding: '12px 0',
+            borderTop: '1px solid var(--border)',
+            borderBottom: '1px solid var(--border)'
           }}>
-            <span style={{ fontSize: 10, color: 'var(--text-secondary)', fontWeight: 600 }}>MATCH SCORE</span>
-            <span style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 16,
-              fontWeight: 700,
-              color: scoreColor(job.match_score),
-            }}>
-              {job.match_score != null ? `${job.match_score.toFixed(1)}%` : '—'}
-            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Status:</span>
+              <span className="flex items-center gap-1.5 font-semibold" style={{ color: latestApp ? getStatusColor(latestApp.status) : 'var(--text-primary)' }}>
+                <span style={{
+                  display: 'inline-block',
+                  width: 6,
+                  height: 6,
+                  borderRadius: '50%',
+                  backgroundColor: latestApp ? getStatusColor(latestApp.status) : 'var(--text-muted)'
+                }} />
+                {latestApp ? latestApp.status.replace(/_/g, ' ') : 'discovered'}
+              </span>
+            </div>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+              <span style={{ color: 'var(--text-muted)' }}>Match Score:</span>
+              <span className="font-mono font-bold" style={{ color: scoreColor(job.match_score) }}>
+                {job.match_score != null ? `${job.match_score.toFixed(1)}%` : '—'}
+              </span>
+            </div>
+
+            {job.tier && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Tier:</span>
+                <span className="badge badge-muted" style={{ fontWeight: 600 }}>Tier {job.tier}</span>
+              </div>
+            )}
+
+            {job.is_test && (
+              <span className="badge badge-red" style={{ fontWeight: 700 }}>TEST RECORD</span>
+            )}
           </div>
 
-          {job.tier && (
-            <span className={`badge ${
-              job.tier === 'A' ? 'badge-green' :
-              job.tier === 'B' ? 'badge-blue' :
-              job.tier === 'C' ? 'badge-amber' : 'badge-muted'
-            }`} style={{ padding: '4px 10px' }}>
-              Tier {job.tier}
-            </span>
-          )}
-
-          {latestApp && (
-            <span className={`badge ${
-              latestApp.status === 'applied' ? 'badge-green' :
-              latestApp.status === 'ready_to_apply' ? 'badge-amber' :
-              latestApp.status === 'applying' ? 'badge-amber' :
-              latestApp.status === 'tailoring' ? 'badge-blue' :
-              'badge-muted'
-            }`} style={{ padding: '4px 10px' }}>
-              {latestApp.status.replace(/_/g, ' ')}
-            </span>
-          )}
-
-          {job.is_test && (
-            <span className="badge badge-red">TEST</span>
-          )}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="tabs mb-4">
-        {(['overview', 'resume', 'contact', 'match', 'log'] as const).map((t) => (
-          <button
-            key={t}
-            className={`tab${activeTab === t ? ' active' : ''}`}
-            onClick={() => setActiveTab(t)}
-          >
-            {t === 'overview' && 'Overview'}
-            {t === 'resume'   && 'Resume'}
-            {t === 'contact'  && 'Contact'}
-            {t === 'match'    && 'Match Details'}
-            {t === 'log'      && 'Application Log'}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Overview tab ─────────────────────────────────────────────────────── */}
-      {activeTab === 'overview' && (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 300px', gap: 16 }}>
+          {/* Job Description Card */}
           <div className="card flex flex-col gap-3">
-            <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Job Description</h3>
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Job Description
+            </h3>
             <div style={{
-              maxHeight: '600px',
+              maxHeight: '400px',
               overflowY: 'auto',
               whiteSpace: 'pre-wrap',
               fontSize: '12px',
+              lineHeight: 1.6,
               color: 'var(--text-secondary)',
               background: 'var(--bg-surface)',
               padding: '12px',
               borderRadius: 'var(--radius)',
               border: '1px solid var(--border)',
             }}>
-              {job.description_text || 'No description available.'}
+              {job.description_text || 'No description text parsed.'}
             </div>
           </div>
 
+          {/* Tailored Resume Accordion */}
           <div className="card flex flex-col gap-3">
-            <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Metadata</h3>
-            <Field label="Title"   value={job.title} />
-            <Field label="Company" value={job.company} />
-            <Field label="Source"  value={job.source} />
-            <Field label="URL"     value={job.url ? (
-              <a href={job.url} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-primary)', textDecoration: 'underline' }}>
-                Open Listing ↗
-              </a>
-            ) : '—'} />
-            <Field label="Discovered" value={job.created_at ? new Date(job.created_at).toLocaleString() : '—'} />
-            <Field label="Applied At" value={job.applied_at ? new Date(job.applied_at).toLocaleString() : '—'} />
-          </div>
-        </div>
-      )}
-
-      {/* ── Resume tab ──────────────────────────────────────────────────────── */}
-      {activeTab === 'resume' && (
-        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-          {latestResume ? (
-            <>
-              <div className="flex items-center justify-between" style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 700 }}>Resume v{latestResume.version}</div>
-                  <div style={{ fontSize: 11, color: 'var(--text-secondary)' }}>
-                    Generated {new Date(latestResume.created_at).toLocaleString()}
-                  </div>
-                </div>
-                <a
-                  href={getResumePdfUrl(job.id, latestResume.id)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-outline btn-sm"
-                >
-                  ⬇ Download PDF
-                </a>
-              </div>
-              <iframe
-                src={getResumePdfUrl(job.id, latestResume.id)}
-                style={{ width: '100%', height: '600px', border: 'none' }}
-                title="Resume PDF"
-              />
-            </>
-          ) : (
-            <div className="empty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 32, height: 32, margin: '0 auto 8px', opacity: 0.5 }}>
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                <polyline points="14 2 14 8 20 8" />
-              </svg>
-              <div className="empty-title">No tailored resume yet</div>
-              <div className="empty-sub">Resume will appear here once the tailoring step completes</div>
+            <div className="flex justify-between items-center" style={{ cursor: 'pointer' }} onClick={() => setResumeExpanded(!resumeExpanded)}>
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Tailored Resume
+              </h3>
+              <button className="btn btn-outline btn-xs" style={{ fontSize: '10px', padding: '2px 8px', borderRadius: '9999px' }}>
+                {resumeExpanded ? 'Hide Preview' : 'Show Preview'}
+              </button>
             </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Contact tab ──────────────────────────────────────────────────────── */}
-      {activeTab === 'contact' && (
-        <div className="flex flex-col gap-4">
-          {(job.contacts ?? []).length === 0 ? (
-            <div className="empty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 32, height: 32, margin: '0 auto 8px', opacity: 0.5 }}>
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                <circle cx="12" cy="7" r="4" />
-              </svg>
-              <div className="empty-title">No contacts found</div>
-              <div className="empty-sub">Scraper did not detect high-probability public team members for this listing.</div>
-            </div>
-          ) : (
-            job.contacts.map((c: any) => (
-              <div key={c.id} className="card flex flex-col gap-3">
-                <div className="flex justify-between items-center">
+            {latestResume ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="flex justify-between items-center" style={{ background: 'var(--bg-surface)', padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
                   <div>
-                    <h4 style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-primary)' }}>{c.name}</h4>
-                    <p style={{ fontSize: 11, color: 'var(--text-secondary)' }}>{c.title} {c.company ? `@ ${c.company}` : ''}</p>
+                    <span className="font-mono text-xs font-bold" style={{ color: 'var(--text-primary)' }}>v{latestResume.version}</span>
+                    <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 8 }}>
+                      Created {new Date(latestResume.created_at).toLocaleDateString()}
+                    </span>
                   </div>
-                  <div className="flex gap-2 items-center">
-                    {c.linkedin_url && (
-                      <a href={c.linkedin_url} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-xs">
-                        LinkedIn ↗
-                      </a>
-                    )}
-                    {c.email && (
-                      <span className={`badge ${
-                        c.email_confidence === 'verified' ? 'badge-green' :
-                        c.email_confidence === 'inferred' ? 'badge-amber' : 'badge-status-neutral'
-                      }`}>
-                        {c.email_confidence}: {c.email}
-                      </span>
-                    )}
-                    <button className="btn btn-outline btn-xs" disabled style={{ opacity: 0.5, cursor: 'not-allowed' }}>
-                      Message Contact (Phase 5)
-                    </button>
-                  </div>
+                  <a
+                    href={getResumePdfUrl(job.id, latestResume.id)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-outline btn-xs"
+                    style={{ gap: 4 }}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 10, height: 10 }}>
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    <span>Download PDF</span>
+                  </a>
                 </div>
-
-                {/* Evidence Trail */}
-                {c.evidence && c.evidence.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    <div className="detail-label">Evidence Trail</div>
-                    <div className="flex flex-col gap-2" style={{ marginTop: 4 }}>
-                      {c.evidence.map((ev: any, idx: number) => (
-                        <div key={idx} style={{
-                          background: 'var(--bg-surface)',
-                          border: '1px solid var(--border)',
-                          borderRadius: 'var(--radius-sm)',
-                          padding: '8px 10px',
-                          fontSize: '11px',
-                        }}>
-                          <div style={{ color: 'var(--text-primary)', fontWeight: 600, marginBottom: 2 }}>
-                            Field: <span className="font-mono">{ev.field}</span>
-                          </div>
-                          <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic', marginBottom: 4 }}>
-                            "{ev.snippet}"
-                          </p>
-                          {ev.source_url && (
-                            <a href={ev.source_url} target="_blank" rel="noopener noreferrer"
-                               style={{ color: 'var(--text-primary)', textDecoration: 'underline' }}>
-                              Source ↗
-                            </a>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                {resumeExpanded && (
+                  <iframe
+                    src={getResumePdfUrl(job.id, latestResume.id)}
+                    style={{ width: '100%', height: '550px', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}
+                    title="Resume PDF"
+                  />
                 )}
               </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {/* ── Match Details tab ─────────────────────────────────────────────────── */}
-      {activeTab === 'match' && (
-        <div className="card flex flex-col gap-4">
-          <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Match Score Breakdown</h3>
-          
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: 12, borderRadius: 'var(--radius)' }}>
-              <div className="detail-label">Overall Match Score</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: scoreColor(job.match_score) }}>
-                {job.match_score != null ? `${job.match_score.toFixed(1)}%` : '—'}
+            ) : (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)', padding: '4px 0' }}>
+                Resume will be tailored once matching threshold qualifiers are verified.
               </div>
-            </div>
-
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: 12, borderRadius: 'var(--radius)' }}>
-              <div className="detail-label">Stage 1 Embedding Score</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
-                {scoreDetails?.embedding_score != null ? `${(scoreDetails.embedding_score * 100).toFixed(1)}%` : '—'}
-              </div>
-            </div>
-
-            <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: 12, borderRadius: 'var(--radius)' }}>
-              <div className="detail-label">Stage 2 Rerank Score</div>
-              <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>
-                {scoreDetails?.llm_rerank_score != null ? `${(scoreDetails.llm_rerank_score * 100).toFixed(1)}%` : '—'}
-              </div>
-            </div>
+            )}
           </div>
 
-          <div style={{ marginTop: 12 }}>
-            <div className="detail-label">Scoring Rationale</div>
+          {/* Match Rationale Card */}
+          <div className="card flex flex-col gap-3">
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Match breakdown & rationale
+            </h3>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: 10, borderRadius: 'var(--radius)' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Stage 1 Embedding Match</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginTop: 2, color: 'var(--text-primary)' }}>
+                  {scoreDetails?.embedding_score != null ? `${(scoreDetails.embedding_score * 100).toFixed(1)}%` : '—'}
+                </div>
+              </div>
+              <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border)', padding: 10, borderRadius: 'var(--radius)' }}>
+                <div style={{ fontSize: 10, color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>Stage 2 LLM Reranker</div>
+                <div style={{ fontSize: 16, fontWeight: 700, marginTop: 2, color: 'var(--text-primary)' }}>
+                  {scoreDetails?.llm_rerank_score != null ? `${(scoreDetails.llm_rerank_score * 100).toFixed(1)}%` : '—'}
+                </div>
+              </div>
+            </div>
             <div style={{
               background: 'var(--bg-surface)',
               border: '1px solid var(--border)',
               borderRadius: 'var(--radius)',
-              padding: 12,
-              fontSize: 12,
+              padding: '12px',
+              fontSize: '12px',
               lineHeight: 1.6,
               color: 'var(--text-secondary)',
               whiteSpace: 'pre-wrap',
+              marginTop: 4
             }}>
-              {scoreDetails?.rationale || 'No scoring rationale found.'}
+              {scoreDetails?.rationale || 'Scoring logic metadata description not available.'}
             </div>
           </div>
-        </div>
-      )}
 
-      {/* ── Application Log tab (formerly Audit) ──────────────────────────────── */}
-      {activeTab === 'log' && (
-        <div className="card flex flex-col gap-3">
-          <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)' }}>Application History</h3>
-          {(job.applications ?? []).length === 0 ? (
-            <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>No application records yet.</p>
-          ) : (
-            job.applications.map((a) => (
-              <div key={a.id} style={{
-                background: 'var(--bg-surface)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius)',
-                padding: 12,
-              }}>
-                <div className="flex justify-between items-center">
-                  <div className="flex gap-2 items-center">
-                    <span className={`badge ${a.status === 'applied' ? 'badge-green' : 'badge-status-neutral'}`}>
-                      {a.status}
-                    </span>
-                    <span className="badge badge-muted">{a.method}</span>
-                  </div>
-                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                    {a.applied_at ? new Date(a.applied_at).toLocaleString() : '—'}
-                  </span>
-                </div>
-                {a.result && (
-                  <div style={{ marginTop: 8 }}>
-                    <div className="detail-label">Result Payload</div>
-                    <pre style={{
-                      background: 'var(--bg-card)',
-                      border: '1px solid var(--border)',
-                      padding: 8,
-                      borderRadius: 'var(--radius-sm)',
-                      fontSize: 11,
-                      fontFamily: 'var(--font-mono)',
-                      overflowX: 'auto',
-                    }}>
-                      {JSON.stringify(a.result, null, 2)}
-                    </pre>
-                  </div>
-                )}
-                <div style={{ marginTop: 8, fontSize: 10, color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
-                  Application ID: {a.id}
-                </div>
+          {/* Application History / log Card */}
+          <div className="card flex flex-col gap-3">
+            <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Application History
+            </h3>
+            {(job.applications ?? []).length === 0 ? (
+              <p style={{ fontSize: 11, color: 'var(--text-muted)' }}>No audit history timeline events recorded.</p>
+            ) : (
+              <div className="table-wrap" style={{ marginTop: 4 }}>
+                <table style={{ fontSize: 11 }}>
+                  <thead>
+                    <tr>
+                      <th>Status</th>
+                      <th>Method</th>
+                      <th>Processed At</th>
+                      <th>Payload Result</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {job.applications.map((a) => (
+                      <tr key={a.id}>
+                        <td>
+                          <span className={`badge ${a.status === 'applied' ? 'badge-green' : 'badge-status-neutral'}`} style={{ textTransform: 'uppercase', fontSize: '9px' }}>
+                            {a.status}
+                          </span>
+                        </td>
+                        <td><span className="font-mono text-xs">{a.method}</span></td>
+                        <td>{a.applied_at ? new Date(a.applied_at).toLocaleString() : '—'}</td>
+                        <td style={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {a.result ? JSON.stringify(a.result) : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            ))
-          )}
-        </div>
-      )}
-    </>
-  );
-}
+            )}
+          </div>
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="detail-field">
-      <div className="detail-label">{label}</div>
-      <div className="detail-value">{value}</div>
-    </div>
+        </div>
+
+        {/* RIGHT COLUMN: Sidebar controls, actions, members */}
+        <aside style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+          
+          {/* Actions & Details Card */}
+          <section className="card flex flex-col gap-4">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: 8 }}>
+              <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Properties
+              </h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 14, height: 14, color: 'var(--text-muted)' }}>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
+            </div>
+
+            {/* Properties List */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Status</span>
+                <span className="font-semibold flex items-center gap-1" style={{ color: latestApp ? getStatusColor(latestApp.status) : 'var(--text-primary)' }}>
+                  <span style={{
+                    width: 6,
+                    height: 6,
+                    borderRadius: '50%',
+                    backgroundColor: latestApp ? getStatusColor(latestApp.status) : 'var(--text-muted)'
+                  }} />
+                  {latestApp ? latestApp.status.replace(/_/g, ' ') : 'discovered'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Priority (Tier)</span>
+                <span className="font-semibold">{job.tier ? `Tier ${job.tier}` : '—'}</span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Match Score</span>
+                <span className="font-mono font-bold" style={{ color: scoreColor(job.match_score) }}>
+                  {job.match_score != null ? `${job.match_score.toFixed(1)}%` : '—'}
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                <span style={{ color: 'var(--text-muted)' }}>Scraped Date</span>
+                <span style={{ color: 'var(--text-secondary)' }}>
+                  {job.created_at ? new Date(job.created_at).toLocaleDateString() : '—'}
+                </span>
+              </div>
+            </div>
+
+            {/* Quick Action Buttons */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+              marginTop: 6,
+              paddingTop: 14,
+              borderTop: '1px solid var(--border)'
+            }}>
+              {latestApp?.status === 'ready_to_apply' && (
+                <button
+                  className="btn btn-primary btn-sm justify-center"
+                  onClick={handleMarkApplied}
+                  disabled={acting}
+                  style={{ gap: 6, width: '100%', borderRadius: '9999px' }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12 }}>
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                  <span>Mark Applied</span>
+                </button>
+              )}
+
+              {latestApp?.status && !['applied', 'discarded', 'skipped'].includes(latestApp.status) && (
+                <button
+                  className="btn btn-outline btn-sm justify-center"
+                  onClick={handlePass}
+                  disabled={acting}
+                  style={{ gap: 6, width: '100%', borderRadius: '9999px' }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12 }}>
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                  <span>Pass Role</span>
+                </button>
+              )}
+
+              {job.url && (
+                <a
+                  href={job.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="btn btn-outline btn-sm justify-center"
+                  style={{ gap: 6, width: '100%', borderRadius: '9999px' }}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ width: 12, height: 12 }}>
+                    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                    <polyline points="15 3 21 3 21 9" />
+                    <line x1="10" y1="14" x2="21" y2="3" />
+                  </svg>
+                  <span>View Original Listing</span>
+                </a>
+              )}
+            </div>
+          </section>
+
+          {/* Members / Scraped Contacts section */}
+          <section className="card flex flex-col gap-3">
+            <h3 style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+              Members / Contacts
+            </h3>
+            {(job.contacts ?? []).length === 0 ? (
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                No high-probability team members parsed for this target listing.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {job.contacts.map((c) => (
+                  <div key={c.id} style={{
+                    padding: 10,
+                    borderRadius: 'var(--radius)',
+                    background: 'var(--bg-surface)',
+                    border: '1px solid var(--border)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6
+                  }}>
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)' }}>{c.name}</div>
+                      <div style={{ fontSize: 10, color: 'var(--text-secondary)' }}>
+                        {c.title} {c.company ? `@ ${c.company}` : ''}
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                      {c.linkedin_url && (
+                        <a href={c.linkedin_url} target="_blank" rel="noopener noreferrer" className="btn btn-outline btn-xs" style={{ fontSize: '9px', padding: '1px 6px' }}>
+                          LinkedIn ↗
+                        </a>
+                      )}
+                      {c.email && (
+                        <span className={`badge ${
+                          c.email_confidence === 'verified' ? 'badge-green' : 'badge-status-neutral'
+                        }`} style={{ fontSize: '9px', padding: '1px 6px' }}>
+                          {c.email}
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      className="btn btn-outline btn-xs justify-center"
+                      disabled
+                      style={{ opacity: 0.5, cursor: 'not-allowed', width: '100%', fontSize: '9px', marginTop: 2 }}
+                    >
+                      Message Contact
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+        </aside>
+
+      </div>
+    </>
   );
 }
