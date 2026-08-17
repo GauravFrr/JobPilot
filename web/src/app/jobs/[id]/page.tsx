@@ -3,9 +3,9 @@ import useSWR from 'swr';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { getJob, passApplication, markApplied, getResumePdfUrl, generateOutreachDraft, updateOutreachDraftSent, type Job } from '@/lib/api';
+import { getJob, applyApplication, passApplication, markApplied, getResumePdfUrl, getFormPreviewUrl, generateOutreachDraft, updateOutreachDraftSent, type Job } from '@/lib/api';
 
-type TabType = 'overview' | 'resume' | 'contact' | 'match' | 'log';
+type TabType = 'overview' | 'resume' | 'form' | 'contact' | 'match' | 'log';
 
 export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,7 +14,7 @@ export default function JobDetailPage() {
   const [acting, setActing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>(() => {
     const tab = (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null) as TabType | null;
-    return (tab && ['overview','resume','contact','match','log'].includes(tab)) ? tab : 'overview';
+    return (tab && ['overview','resume','form','contact','match','log'].includes(tab)) ? tab : 'overview';
   });
   const [expandedEvidence, setExpandedEvidence] = useState<{ [key: string]: boolean }>({});
 
@@ -29,7 +29,7 @@ export default function JobDetailPage() {
   // Sync tab param when searchParams changes
   useEffect(() => {
     const tab = searchParams.get('tab') as TabType | null;
-    if (tab && ['overview','resume','contact','match','log'].includes(tab)) {
+    if (tab && ['overview','resume','form','contact','match','log'].includes(tab)) {
       setActiveTab(tab);
     }
   }, [searchParams]);
@@ -81,6 +81,28 @@ export default function JobDetailPage() {
     } finally {
       setActing(false);
     }
+  }
+
+  async function handleApply() {
+    if (!latestApp) return;
+    setActing(true);
+    try {
+      await applyApplication(latestApp.id);
+      toast.success('Application triggered asynchronously');
+      mutate();
+    } catch (e: unknown) {
+      toast.error((e as Error).message);
+    } finally {
+      setActing(false);
+    }
+  }
+
+  async function handleApplyTierB() {
+    if (!job || !latestApp) return;
+    if (job.url) {
+      window.open(job.url, '_blank');
+    }
+    await handleMarkApplied();
   }
 
   const scoreColor = (s: number | null) => {
@@ -174,11 +196,19 @@ export default function JobDetailPage() {
             paddingBottom: 2,
             marginBottom: 4
           }}>
-            {(['overview', 'resume', 'contact', 'match', 'log'] as TabType[]).map((tab) => {
+            {(() => {
+              const tabs: TabType[] = ['overview', 'resume'];
+              if (job.tier === 'B') {
+                tabs.push('form');
+              }
+              tabs.push('contact', 'match', 'log');
+              return tabs;
+            })().map((tab) => {
               const label = tab === 'overview' ? 'Overview' :
                 tab === 'resume' ? 'Resume' :
-                  tab === 'contact' ? 'Contact' :
-                    tab === 'match' ? 'Match Details' : 'Application Log';
+                  tab === 'form' ? 'Form Preview' :
+                    tab === 'contact' ? 'Contact' :
+                      tab === 'match' ? 'Match Details' : 'Application Log';
               const isActive = activeTab === tab;
               return (
                 <button
@@ -280,6 +310,27 @@ export default function JobDetailPage() {
                   No resume tailored for this job listing. A resume version is generated when the job passes the matching threshold.
                 </div>
               )}
+            </div>
+          )}
+
+          {activeTab === 'form' && (
+            <div className="card flex flex-col gap-4">
+              <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                Pre-Filled Form Preview
+              </h3>
+              <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                This is a screenshot of the pre-filled form fields before final submission. Review it carefully before clicking Apply.
+              </p>
+              <div style={{ position: 'relative', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
+                <img
+                  src={getFormPreviewUrl(job.id)}
+                  alt="Form Preview Screenshot"
+                  style={{ width: '100%', height: 'auto', display: 'block', borderRadius: 'var(--radius)' }}
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
             </div>
           )}
 
@@ -566,8 +617,12 @@ export default function JobDetailPage() {
                           </td>
                           <td><span className="font-mono text-xs">{a.method}</span></td>
                           <td>{a.applied_at ? new Date(a.applied_at).toLocaleString() : '—'}</td>
-                          <td style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {a.result ? JSON.stringify(a.result) : '—'}
+                          <td style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={a.result ? (typeof a.result === 'object' ? JSON.stringify(a.result, null, 2) : String(a.result)) : ''}>
+                            {a.result ? (
+                              typeof a.result === 'object' ? (
+                                (a.result as any).message || (a.result as any).error || JSON.stringify(a.result)
+                              ) : String(a.result)
+                            ) : '—'}
                           </td>
                         </tr>
                       ))}
@@ -640,17 +695,45 @@ export default function JobDetailPage() {
               borderTop: '1px solid var(--border)'
             }}>
               {latestApp?.status === 'ready_to_apply' && (
-                <button
-                  className="btn btn-primary btn-sm justify-center"
-                  onClick={handleMarkApplied}
-                  disabled={acting}
-                  style={{ gap: 6, width: '100%', borderRadius: '9999px' }}
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12 }}>
-                    <polyline points="20 6 9 17 4 12" />
-                  </svg>
-                  <span>Mark Applied</span>
-                </button>
+                <>
+                  {job.tier === 'A' ? (
+                    <button
+                      className="btn btn-primary btn-sm justify-center"
+                      onClick={handleApply}
+                      disabled={acting}
+                      style={{ gap: 6, width: '100%', borderRadius: '9999px' }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12 }}>
+                        <polygon points="3 11 22 2 13 21 11 13 3 11" />
+                      </svg>
+                      <span>Auto Apply</span>
+                    </button>
+                  ) : job.tier === 'B' ? (
+                    <button
+                      className="btn btn-primary btn-sm justify-center"
+                      onClick={handleApplyTierB}
+                      disabled={acting}
+                      style={{ gap: 6, width: '100%', borderRadius: '9999px' }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12 }}>
+                        <polygon points="3 11 22 2 13 21 11 13 3 11" />
+                      </svg>
+                      <span>Apply</span>
+                    </button>
+                  ) : (
+                    <button
+                      className="btn btn-primary btn-sm justify-center"
+                      onClick={handleMarkApplied}
+                      disabled={acting}
+                      style={{ gap: 6, width: '100%', borderRadius: '9999px' }}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 12, height: 12 }}>
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                      <span>Mark Applied</span>
+                    </button>
+                  )}
+                </>
               )}
 
               {latestApp?.status && !['applied', 'discarded', 'skipped'].includes(latestApp.status) && (

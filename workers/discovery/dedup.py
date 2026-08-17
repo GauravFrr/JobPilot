@@ -31,12 +31,15 @@ async def is_duplicate(session: AsyncSession, new_job: dict) -> bool:
     1. Uniqueness check: (source, source_job_id) - Database has UNIQUE constraint, but we check first.
     2. Fuzzy check: Same company, similar title (>=85%), and posted within +/- 3 days of existing job.
     """
+    is_test_run = new_job.get("is_test", False)
+
     # 1. Uniqueness check
     if new_job.get("source_job_id"):
         stmt = select(JobRaw).where(
             and_(
                 JobRaw.source == new_job["source"],
-                JobRaw.source_job_id == str(new_job["source_job_id"])
+                JobRaw.source_job_id == str(new_job["source_job_id"]),
+                JobRaw.is_test == is_test_run
             )
         )
         result = await session.execute(stmt)
@@ -65,6 +68,7 @@ async def is_duplicate(session: AsyncSession, new_job: dict) -> bool:
     stmt = select(JobRaw).where(
         and_(
             func_lower_company(JobRaw.company) == company_name,
+            JobRaw.is_test == is_test_run,
             or_(
                 JobRaw.posted_date.between(start_date, end_date),
                 # If existing job has no posted date, match close to discovered_at

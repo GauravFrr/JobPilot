@@ -11,7 +11,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".
 from app.db import get_db
 from app.models.applications import Application
 from app.models.jobs import JobRaw
-from workers.applying.tier_a_apply import execute_submission
+from workers.applying.tier_a_apply import execute_submission as execute_tier_a_submission
+from workers.applying.tier_b_apply import execute_linkedin_submission as execute_tier_b_submission
 
 router = APIRouter(
     prefix="/applications",
@@ -47,7 +48,10 @@ async def apply_job(application_id: str, background_tasks: BackgroundTasks, db: 
     await db.commit()
     
     # Run submission asynchronously in background
-    background_tasks.add_task(execute_submission, str(app.id))
+    if app.tier == "B":
+        background_tasks.add_task(execute_tier_b_submission, str(app.id))
+    else:
+        background_tasks.add_task(execute_tier_a_submission, str(app.id))
     
     return {
         "application_id": str(app.id),

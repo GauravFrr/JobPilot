@@ -11,15 +11,34 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 }
 
-def parse_date(date_str: Optional[str]) -> Optional[date]:
-    """Tries to parse date from string or returns None."""
+def parse_date(date_str: Any) -> Optional[date]:
+    """Tries to parse date from string, numeric timestamp or returns None."""
     if not date_str:
         return None
-    for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%fZ", "%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S %Z"):
+        
+    if isinstance(date_str, (int, float)):
+        if date_str > 1e11:
+            date_str = date_str / 1000.0
         try:
-            return datetime.strptime(date_str, fmt).date()
-        except ValueError:
-            continue
+            return datetime.fromtimestamp(date_str).date()
+        except Exception:
+            return None
+            
+    if isinstance(date_str, str):
+        if date_str.isdigit():
+            try:
+                val = float(date_str)
+                if val > 1e11:
+                    val = val / 1000.0
+                return datetime.fromtimestamp(val).date()
+            except Exception:
+                pass
+                
+        for fmt in ("%Y-%m-%d", "%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S.%fZ", "%a, %d %b %Y %H:%M:%S %z", "%a, %d %b %Y %H:%M:%S %Z"):
+            try:
+                return datetime.strptime(date_str, fmt).date()
+            except ValueError:
+                continue
     return None
 
 async def fetch_remoteok_jobs() -> List[Dict[str, Any]]:
@@ -231,3 +250,95 @@ async def fetch_lever_job(company_token: str, job_id: str) -> Optional[Dict[str,
         except Exception as e:
             logger.error(f"Error fetching Lever job: {str(e)}")
             return None
+
+async def fetch_greenhouse_board(company_token: str) -> List[Dict[str, Any]]:
+    """Fetches all jobs from a company's Greenhouse board and returns them normalized."""
+    url = f"https://boards-api.greenhouse.io/v1/boards/{company_token}/jobs?content=true"
+    logger.info(f"Fetching all Greenhouse board jobs for: {company_token}...")
+    async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True) as client:
+        try:
+            response = await client.get(url, timeout=15)
+            if response.status_code != 200:
+                logger.error(f"Greenhouse board fetch failed with status {response.status_code}")
+                return []
+                
+            data = response.json()
+            jobs = data.get("jobs", [])
+            normalized = []
+            for job in jobs:
+                job_id = str(job.get("id"))
+                title = job.get("title", "Unknown")
+                desc = job.get("content", "")
+                location = job.get("location", {}).get("name", "")
+                is_remote = "remote" in location.lower() or "remote" in title.lower()
+                
+                normalized.append({
+                    "source": f"greenhouse:{company_token}",
+                    "source_tier": "A",
+                    "source_job_id": job_id,
+                    "source_url": job.get("absolute_url"),
+                    "company": company_token.capitalize(),
+                    "title": title,
+                    "description_text": desc,
+                    "location": location,
+                    "is_remote": is_remote,
+                    "posted_date": parse_date(job.get("updated_at")) or date.today(),
+                    "raw_payload": job,
+                    "status": "discovered"
+                })
+            logger.info(f"Discovered {len(normalized)} jobs from Greenhouse board '{company_token}'.")
+            return normalized
+        except Exception as e:
+            logger.error(f"Error fetching Greenhouse board {company_token}: {str(e)}")
+            return []
+
+async def fetch_lever_board(company_token: str) -> List[Dict[str, Any]]:
+    """Fetches all postings from a company's Lever board and returns them normalized."""
+    url = f"https://api.lever.co/v0/postings/{company_token}?mode=json"
+    logger.info(f"Fetching all Lever board jobs for: {company_token}...")
+    async with httpx.AsyncClient(headers=HEADERS, follow_redirects=True) as client:
+        try:
+            response = await client.get(url, timeout=15)
+            if response.status_code != 200:
+                logger.error(f"Lever board fetch failed with status {response.status_code}")
+                return []
+                
+            jobs = response.json()
+            if not isinstance(jobs, list):
+                logger.error(f"Expected list from Lever board API, got {type(jobs)}")
+                return []
+                
+            normalized = []
+            for job in jobs:
+                job_id = str(job.get("id"))
+                title = job.get("text", "Unknown")
+                
+                # Build description from plain text representation
+                desc = job.get("descriptionPlain", "") + "\n" + "\n".join(
+                    [list(item.values())[0] if isinstance(item, dict) else str(item) for item in job.get("lists", [])]
+                )
+                
+                categories = job.get("categories", {})
+                location = categories.get("location", "")
+                is_remote = categories.get("commitment") == "Remote" or "remote" in location.lower() or "remote" in title.lower()
+                
+                normalized.append({
+                    "source": f"lever:{company_token}",
+                    "source_tier": "A",
+                    "source_job_id": job_id,
+                    "source_url": job.get("hostedUrl"),
+                    "company": company_token.capitalize(),
+                    "title": title,
+                    "description_text": desc,
+                    "location": location,
+                    "is_remote": is_remote,
+                    "posted_date": parse_date(job.get("createdAt")),
+                    "raw_payload": job,
+                    "status": "discovered"
+                })
+            logger.info(f"Discovered {len(normalized)} jobs from Lever board '{company_token}'.")
+            return normalized
+        except Exception as e:
+            logger.error(f"Error fetching Lever board {company_token}: {str(e)}")
+            return []
+

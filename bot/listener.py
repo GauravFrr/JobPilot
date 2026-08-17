@@ -184,6 +184,51 @@ async def start_event_listener(bot: Bot):
                         builder.adjust(1)
                         await bot.send_message(chat_id, text, reply_markup=builder.as_markup())
                         
+                elif event_type == "job.captcha_detected":
+                    app_id = payload.get("application_id")
+                    
+                    async with AsyncSessionLocal() as session:
+                        stmt = select(DBJobRaw).where(DBJobRaw.id == job_id)
+                        res = await session.execute(stmt)
+                        job = res.scalars().first()
+                        
+                    if job:
+                        text = (
+                            f"⚠️ **CAPTCHA Block Encountered!**\n\n"
+                            f"LinkedIn has prompted for verification/CAPTCHA during Easy Apply pre-fill or submission for:\n"
+                            f"🏢 **{job.company}**\n"
+                            f"💼 **{job.title}**\n\n"
+                            f"Please open headed Chromium or view in your dashboard to manually verify and complete the application."
+                        )
+                        builder = InlineKeyboardBuilder()
+                        builder.button(text="🌐 View Dashboard", url=f"http://127.0.0.1:3000/applications/{app_id}")
+                        builder.adjust(1)
+                        await bot.send_message(chat_id, text, reply_markup=builder.as_markup(), parse_mode="Markdown")
+                        
+                elif event_type == "weekly_summary":
+                    discovered = payload.get("discovered", 0)
+                    matched = payload.get("matched", 0)
+                    ready = payload.get("ready", 0)
+                    applied = payload.get("applied", 0)
+                    contacts = payload.get("contacts", 0)
+                    
+                    text = (
+                        f"📊 **Weekly Activity Summary**\n\n"
+                        f"🔍 Jobs Discovered: `{discovered}`\n"
+                        f"🎯 Jobs Matched: `{matched}`\n"
+                        f"⏳ Ready to Apply: `{ready}`\n"
+                        f"✅ Applications Submitted: `{applied}`\n"
+                        f"👤 Recruiter Contacts Found: `{contacts}`\n\n"
+                        f"🔗 View details on the [Dashboard](http://127.0.0.1:3000/)"
+                    )
+                    await bot.send_message(chat_id, text, parse_mode="Markdown")
+                    
+                elif event_type == "general.notification":
+                    msg_text = payload.get("text", "")
+                    if msg_text:
+                        await bot.send_message(chat_id, msg_text, parse_mode="Markdown")
+                        
+                        
             except Exception as ex:
                 logger.error(f"Error handling pubsub message payload: {str(ex)}")
                 

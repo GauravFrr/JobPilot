@@ -108,10 +108,18 @@ async def generate(prompt: str, task_type: str, model_tier: str = "cheap") -> st
             ]
         }
         
+        base_url = os.environ.get("CLAUDE_API_BASE", "https://api.anthropic.com").rstrip('/')
+        if "/messages" in base_url:
+            endpoint = base_url
+        elif base_url.endswith("/v1"):
+            endpoint = f"{base_url}/messages"
+        else:
+            endpoint = f"{base_url}/v1/messages"
+        
         async with httpx.AsyncClient() as httpx_client:
             try:
                 response = await httpx_client.post(
-                    "https://api.anthropic.com/v1/messages",
+                    endpoint,
                     headers=headers,
                     json=payload,
                     timeout=30

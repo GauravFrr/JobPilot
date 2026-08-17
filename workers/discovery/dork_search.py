@@ -62,6 +62,31 @@ async def execute_google_search(query: str, api_key: str, cx: str) -> List[Dict[
             logger.error(f"Google Search API error: {str(e)}")
             return []
 
+async def execute_serper_search(query: str, api_key: str) -> List[Dict[str, Any]]:
+    """Runs a search query on Serper.dev API (Google Search scraper)."""
+    url = "https://google.serper.dev/search"
+    headers = {
+        "X-API-KEY": api_key,
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "q": query,
+        "num": 10
+    }
+    async with httpx.AsyncClient() as client:
+        try:
+            logger.info(f"Running Serper.dev Google Search for: {query}")
+            response = await client.post(url, headers=headers, json=payload, timeout=10)
+            if response.status_code != 200:
+                logger.error(f"Serper API returned {response.status_code}: {response.text}")
+                return []
+            data = response.json()
+            return data.get("organic", [])
+        except Exception as e:
+            logger.error(f"Serper API error: {str(e)}")
+            return []
+
+
 async def parse_dork_result(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     """Parses a single Google Custom Search item and normalizes or routes it."""
     link = item.get("link", "")
@@ -123,7 +148,7 @@ async def parse_dork_result(item: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         
     return None
 
-async def run_dork_search(api_key: str, cx: str) -> List[Dict[str, Any]]:
+async def run_dork_search(api_key: str, cx: str = None) -> List[Dict[str, Any]]:
     """Runs dork search queries for all target roles and template dorks, returning normalized jobs."""
     roles = await get_target_roles()
     templates = await get_active_dork_templates()
@@ -137,7 +162,11 @@ async def run_dork_search(api_key: str, cx: str) -> List[Dict[str, Any]]:
     for role in roles:
         for template in templates:
             query = template.format(role=role)
-            items = await execute_google_search(query, api_key, cx)
+            # Route search query depending on whether CX is present
+            if cx:
+                items = await execute_google_search(query, api_key, cx)
+            else:
+                items = await execute_serper_search(query, api_key)
             
             for item in items:
                 try:
@@ -148,3 +177,4 @@ async def run_dork_search(api_key: str, cx: str) -> List[Dict[str, Any]]:
                     logger.error(f"Error parsing dork item {item.get('link')}: {str(e)}")
                     
     return discovered_jobs
+

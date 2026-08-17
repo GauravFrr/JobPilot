@@ -18,6 +18,7 @@ from app.config import settings
 from workers.discovery.tier_a_apis import fetch_remoteok_jobs, fetch_wwr_jobs, fetch_remotive_jobs
 from workers.discovery.dork_search import run_dork_search
 from workers.discovery.dedup import is_duplicate
+from workers.discovery.tier_c_crawlers import run_tier_c_crawl
 
 # Import matching components
 from workers.matching.score import process_matching_for_job
@@ -90,14 +91,20 @@ async def process_new_jobs_pipeline():
     discovered_jobs.extend(await fetch_wwr_jobs())
     discovered_jobs.extend(await fetch_remotive_jobs())
     
-    # Run Google Custom Search dork search if keys are present
-    google_key = settings.gemini_api_key or os.environ.get("GOOGLE_SEARCH_API_KEY") # Check google search keys
+    # Run Google Custom Search or Serper dork search if API key is present
+    google_key = os.environ.get("GOOGLE_SEARCH_API_KEY") or settings.gemini_api_key
     google_cx = os.environ.get("GOOGLE_SEARCH_CX")
-    if google_key and google_cx:
-        logger.info("Google Search API keys detected. Running dork search discovery...")
+    if google_key:
+        logger.info("Google/Serper Search API key detected. Running dork search discovery...")
         discovered_jobs.extend(await run_dork_search(google_key, google_cx))
     else:
-        logger.info("Google Custom Search API keys not set. Skipping dork search discovery.")
+        logger.info("Google Search API key not set. Skipping dork search discovery.")
+        
+    # Run Tier C Target Company Career Pages Crawl
+    try:
+        await run_tier_c_crawl()
+    except Exception as e:
+        logger.error(f"Error executing Tier C Careers Crawl pipeline: {str(e)}")
         
     # 2. Ingest and deduplicate jobs
     new_job_ids = []
@@ -123,60 +130,105 @@ async def process_new_jobs_pipeline():
     logger.info(f"Ingested {len(new_job_ids)} new unique jobs. Proceeding to score...")
     
     # 3. Match / Score
-    matched_job_ids = []
-    for job_id in new_job_ids:
-        score_rec = await process_matching_for_job(job_id)
-        if score_rec:
-            # Check if it was matched
-            async with AsyncSessionLocal() as session:
-                stmt = select(JobRaw).where(JobRaw.id == job_id)
-                result = await session.execute(stmt)
-                job = result.scalars().first()
-                if job and job.status == "matched":
-                    matched_job_ids.append(job_id)
+    # Query all jobs currently in 'discovered' status to ensure self-healing (picks up previous incomplete runs)
+    unscored_job_ids = []
+    async with AsyncSessionLocal() as session:
+        stmt = select(JobRaw.id).where(JobRaw.status == "discovered")
+        res = await session.execute(stmt)
+        unscored_job_ids = res.scalars().all()
+        
+    logger.info(f"Found {len(unscored_job_ids)} discovered jobs to process matching for.")
+    for job_id in unscored_job_ids:
+        await process_matching_for_job(job_id)
 
     # 4. Tailor matched jobs
-    tailored_job_ids = []
+    # Query all jobs currently in 'matched' status to process tailoring (self-healing queue)
+    matched_jobs_to_tailor = []
     async with AsyncSessionLocal() as session:
-        stmt = select(ResumeProfile).where(ResumeProfile.is_active == True)
-        result = await session.execute(stmt)
-        profile = result.scalars().first()
-        if not profile:
-            logger.error("No active profile, skipping tailoring.")
-            return
-            
-        tailor_tasks = []
-        for job_id in matched_job_ids:
-            stmt = select(JobRaw).where(JobRaw.id == job_id)
+        stmt = select(JobRaw).where(JobRaw.status == "matched")
+        res = await session.execute(stmt)
+        matched_jobs_to_tailor = res.scalars().all()
+        
+    if matched_jobs_to_tailor:
+        async with AsyncSessionLocal() as session:
+            stmt = select(ResumeProfile).where(ResumeProfile.is_active == True)
             result = await session.execute(stmt)
-            job = result.scalars().first()
-            if job:
-                # 1. Run contact finder in the background (non-blocking, parallel)
-                logger.info(f"Triggering parallel contact finder worker for matched job {job.id}")
-                asyncio.create_task(run_contact_finder_for_job(str(job.id)))
-                
-                # 2. Run tailoring pipeline
-                tailor_tasks.append((job, run_tailoring_pipeline(session, job, profile)))
-                
-        for job, task in tailor_tasks:
-            success = await task
-            if success:
-                tailored_job_ids.append(job.id)
+            profile = result.scalars().first()
+            if not profile:
+                logger.error("No active profile, skipping tailoring.")
+            else:
+                tailor_tasks = []
+                for job in matched_jobs_to_tailor:
+                    # 1. Run contact finder in the background (non-blocking, parallel)
+                    logger.info(f"Triggering parallel contact finder worker for matched job {job.id}")
+                    asyncio.create_task(run_contact_finder_for_job(str(job.id)))
+                    
+                    # 2. Run tailoring pipeline
+                    tailor_tasks.append(run_tailoring_pipeline(session, job, profile))
+                    
+                await asyncio.gather(*tailor_tasks, return_exceptions=True)
 
-    # 5. Pre-build application payloads
-    for job_id in tailored_job_ids:
-        await pre_build_application_payload(job_id)
+    # 5. Pre-build application payloads or pre-fill form screenshots
+    # Query all jobs currently in 'tailored' status to pre-build payloads (self-healing queue)
+    tailored_jobs_to_prebuild = []
+    async with AsyncSessionLocal() as session:
+        stmt = select(JobRaw).where(JobRaw.status == "tailored")
+        res = await session.execute(stmt)
+        tailored_jobs_to_prebuild = res.scalars().all()
+        
+    for job in tailored_jobs_to_prebuild:
+        if job.source_tier == "B":
+            try:
+                from workers.applying.tier_b_apply import pre_build_tier_b_application
+                await pre_build_tier_b_application(str(job.id))
+            except Exception as e:
+                logger.error(f"Failed promoting manual app for job {job.id}: {str(e)}")
+        else:
+            await pre_build_application_payload(job.id)
 
     logger.info("Pipeline run complete.")
 
+async def check_and_trigger_weekly_digest(session: AsyncSession):
+    """Checks if today is Sunday evening and triggers the weekly summary telegram message."""
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    # Check if Sunday (weekday 6) and hour is 21 (9 PM UTC)
+    if now.weekday() == 6 and now.hour >= 21:
+        sunday_date_str = now.strftime("%Y-%m-%d")
+        
+        from app.models.settings import Setting
+        stmt = select(Setting).where(Setting.key == "last_weekly_digest_sent")
+        res = await session.execute(stmt)
+        s = res.scalars().first()
+        
+        if not s or s.value != sunday_date_str:
+            logger.info("Triggering weekly digest message dispatch...")
+            from workers.contacts.weekly_digest import send_weekly_digest
+            await send_weekly_digest()
+            
+            # Save setting
+            if not s:
+                s = Setting(key="last_weekly_digest_sent", value=sunday_date_str)
+                session.add(s)
+            else:
+                s.value = sunday_date_str
+            await session.commit()
+
 async def main():
     logger.info("Scheduler starting...")
-    # For Phase 1 manual verification, we run the loop once on startup
-    await process_new_jobs_pipeline()
-    
-    # Keep active
     while True:
-        await asyncio.sleep(3600)
+        try:
+            await process_new_jobs_pipeline()
+            
+            # Check and trigger weekly digest
+            async with AsyncSessionLocal() as session:
+                await check_and_trigger_weekly_digest(session)
+                
+        except Exception as e:
+            logger.error(f"Error in scheduler main loop: {str(e)}")
+            
+        logger.info("Scheduler loop completed. Sleeping for 2 hours...")
+        await asyncio.sleep(7200)
 
 if __name__ == "__main__":
     asyncio.run(main())

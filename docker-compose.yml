@@ -17,7 +17,7 @@ services:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-jobpilot}"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 30
 
   redis:
     image: redis:7-alpine
@@ -40,6 +40,8 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - CLAUDE_API_BASE=${CLAUDE_API_BASE}
+      - LLM_PROVIDER=${LLM_PROVIDER}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - HUNTER_API_KEY=${HUNTER_API_KEY}
       - GOOGLE_SEARCH_API_KEY=${GOOGLE_SEARCH_API_KEY}
@@ -47,6 +49,11 @@ services:
       - PYTHONPATH=/app
     ports:
       - "${API_PORT:-8000}:8000"
+    volumes:
+      - ./api/app:/app/app
+      - ./workers:/app/workers
+      - ./api/resumes:/app/api/resumes
+      - ./storage_state:/app/storage_state
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,11 +71,18 @@ services:
       - REDIS_URL=redis://redis:6379/0
       - GEMINI_API_KEY=${GEMINI_API_KEY}
       - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - CLAUDE_API_BASE=${CLAUDE_API_BASE}
+      - LLM_PROVIDER=${LLM_PROVIDER}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
       - HUNTER_API_KEY=${HUNTER_API_KEY}
       - GOOGLE_SEARCH_API_KEY=${GOOGLE_SEARCH_API_KEY}
       - GOOGLE_SEARCH_CX=${GOOGLE_SEARCH_CX}
       - PYTHONPATH=/app
+    volumes:
+      - ./api/app:/app/app
+      - ./workers:/app/workers
+      - ./api/resumes:/app/api/resumes
+      - ./storage_state:/app/storage_state
     depends_on:
       postgres:
         condition: service_healthy
@@ -98,8 +112,11 @@ services:
     build:
       context: ./web
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - API_URL=http://api:8000
+      - NEXT_PUBLIC_API_URL=
       - FRONTEND_URL=http://localhost:3000
     ports:
       - "3000:3000"

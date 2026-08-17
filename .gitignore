@@ -65,3 +65,9 @@ Thumbs.db
 # Resumes output
 api/resumes/
 
+# Scratch & DB backups
+a
+aa
+aaa
+storage_state/
+

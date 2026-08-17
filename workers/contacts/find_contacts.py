@@ -36,6 +36,34 @@ def verify_evidence_snippet(field_val: str, snippet: str) -> bool:
         return False
     return any(p in snippet.lower() for p in parts)
 
+def email_matches_name(email: str, name: str) -> bool:
+    """Verifies that the email either matches the contact's name, or is a generic company email."""
+    if not email or not name:
+        return False
+    username = email.split("@")[0].lower()
+    
+    # Generic prefix lists
+    generic_prefixes = ["jobs", "careers", "recruiting", "recruitment", "hr", "talent", "info", "hello", "contact", "support", "hiring"]
+    if any(prefix == username for prefix in generic_prefixes):
+        return True
+        
+    # Clean username for matching
+    clean_username = username.replace(".", "").replace("_", "").replace("-", "")
+    name_parts = re.findall(r"\w+", name.lower())
+    
+    # Require at least one name part (longer than 2 chars) to be present in the personal username
+    return any(part in clean_username for part in name_parts if len(part) > 2)
+
+def clean_contact_name(name: str) -> str:
+    """Cleans trailing noise and common lowercase filler words from the extracted contact name."""
+    if not name:
+        return ""
+    words = name.strip().split()
+    noise_words = {"on", "at", "or", "to", "the", "from", "in", "with", "please", "our", "apply", "job", "is", "a", "an", "and"}
+    while words and (words[-1].lower() in noise_words or not words[-1][0].isupper()):
+        words.pop()
+    return " ".join(words)
+
 def get_role_keyword(title: str) -> str:
     """Gets a matching keyword category based on the job title to narrow down LinkedIn searches."""
     title_lower = title.lower()
@@ -104,17 +132,21 @@ async def parse_ats_metadata(job: JobRaw) -> List[Dict[str, Any]]:
     patterns = [
         (r"(?i)hiring manager:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)", "Hiring Manager"),
         (r"(?i)recruiter:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)", "Recruiter"),
-        (r"(?i)reach out to:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)", "Point of Contact")
+        (r"(?i)reach out to:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)", "Point of Contact"),
+        (r"(?i)contact:\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)", "Point of Contact")
     ]
     for pattern, title in patterns:
         match = re.search(pattern, jd)
         if match:
             name = match.group(1).strip()
+            name = clean_contact_name(name)
             # Verify name doesn't contain noise
-            if len(name) < 40 and not any(noise in name.lower() for noise in ["the", "our", "apply", "job", "please"]):
+            if name and len(name) < 40 and not any(noise in name.lower() for noise in ["the", "our", "apply", "job", "please"]):
                 # Look for email nearby
                 email_match = EMAIL_RE.search(jd, max(0, match.start() - 100), min(len(jd), match.end() + 100))
                 email = email_match.group(0) if email_match else None
+                if email and not email_matches_name(email, name):
+                    email = None
                 contacts.append({
                     "name": name,
                     "title": f"{title} at {job.company}",
@@ -395,6 +427,24 @@ async def run_contact_finder_for_job(job_id: str) -> bool:
                             "source_url": job.source_url
                         }
                     ]
+                else:
+                    evidence = list(evidence)
+                    
+                # Add email evidence entry if email was found or inferred
+                if email:
+                    if confidence == "verified" and c_data.get("email"):
+                        email_snippet = f"Email found directly in source text: {email}"
+                    elif confidence == "verified":
+                        email_snippet = f"Email verified via SMTP/Hunter handshake pattern: {email}"
+                    else:
+                        email_snippet = f"Inferred candidate email pattern: {email}"
+                        
+                    if not any(ev.get("field") == "email" for ev in evidence):
+                        evidence.append({
+                            "field": "email",
+                            "snippet": email_snippet,
+                            "source_url": job.source_url
+                        })
                     
                 # Insert contact
                 contact_rec = Contact(

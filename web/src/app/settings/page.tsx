@@ -29,6 +29,15 @@ export default function SettingsPage() {
   // ─── Local Edit States ─────────────────────────────────────────────────────
   const [profileText, setProfileText] = useState('');
   const [profileUnsaved, setProfileUnsaved] = useState(false);
+  const [resumeEditMode, setResumeEditMode] = useState<'form' | 'json'>('form');
+  const [profileData, setProfileData] = useState<any>({
+    name: '',
+    target_roles: [],
+    skills: {},
+    experience: [],
+    projects: []
+  });
+
   const [companiesList, setCompaniesList] = useState<TargetCompany[]>([]);
   const [minScore, setMinScore] = useState<number>(70);
   const [caps, setCaps] = useState<Record<string, number>>({});
@@ -40,9 +49,48 @@ export default function SettingsPage() {
   useEffect(() => {
     if (profile?.content_json) {
       setProfileText(JSON.stringify(profile.content_json, null, 2));
+      const raw = profile.content_json;
+      setProfileData({
+        name: raw.name || '',
+        target_roles: Array.isArray(raw.target_roles) ? raw.target_roles : [],
+        skills: (raw.skills && typeof raw.skills === 'object') ? raw.skills : {},
+        experience: Array.isArray(raw.experience) ? raw.experience : [],
+        projects: Array.isArray(raw.projects) ? raw.projects : [],
+        ...raw
+      });
       setProfileUnsaved(false);
     }
   }, [profile]);
+
+  const updateProfileField = (key: string, value: any) => {
+    const updated = {
+      ...profileData,
+      [key]: value
+    };
+    setProfileData(updated);
+    setProfileText(JSON.stringify(updated, null, 2));
+    setProfileUnsaved(true);
+  };
+
+  const handleTabChange = (mode: 'form' | 'json') => {
+    if (mode === 'form') {
+      try {
+        const parsed = JSON.parse(profileText);
+        setProfileData({
+          name: parsed.name || '',
+          target_roles: Array.isArray(parsed.target_roles) ? parsed.target_roles : [],
+          skills: (parsed.skills && typeof parsed.skills === 'object') ? parsed.skills : {},
+          experience: Array.isArray(parsed.experience) ? parsed.experience : [],
+          projects: Array.isArray(parsed.projects) ? parsed.projects : [],
+          ...parsed
+        });
+      } catch (e) {
+        toast.error('Cannot switch to form view: Invalid JSON syntax in editor.');
+        return;
+      }
+    }
+    setResumeEditMode(mode);
+  };
 
   useEffect(() => {
     if (targetCompanies) setCompaniesList(targetCompanies);
@@ -201,16 +249,319 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            <textarea
-              className="input font-mono"
-              style={{ height: '300px', fontSize: '11px', lineHeight: '1.4' }}
-              value={profileText}
-              onChange={(e) => {
-                setProfileText(e.target.value);
-                setProfileUnsaved(true);
-              }}
-              placeholder="{}"
-            />
+            {/* View Mode Selector Tabs */}
+            <div className="flex gap-2" style={{ borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
+              <button
+                type="button"
+                className={`btn btn-xs ${resumeEditMode === 'form' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => handleTabChange('form')}
+              >
+                Visual Editor
+              </button>
+              <button
+                type="button"
+                className={`btn btn-xs ${resumeEditMode === 'json' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => handleTabChange('json')}
+              >
+                Raw JSON
+              </button>
+            </div>
+
+            {resumeEditMode === 'json' ? (
+              <textarea
+                className="input font-mono"
+                style={{ height: '350px', fontSize: '11px', lineHeight: '1.4' }}
+                value={profileText}
+                onChange={(e) => {
+                  setProfileText(e.target.value);
+                  setProfileUnsaved(true);
+                }}
+                placeholder="{}"
+              />
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', fontSize: '12px' }}>
+                {/* Name & Target Roles */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div className="detail-field">
+                    <label className="detail-label" style={{ fontWeight: '600', marginBottom: '4px', display: 'block' }}>Name</label>
+                    <input
+                      className="input"
+                      value={profileData.name}
+                      onChange={(e) => updateProfileField('name', e.target.value)}
+                      placeholder="Your Name"
+                    />
+                  </div>
+                  <div className="detail-field">
+                    <label className="detail-label" style={{ fontWeight: '600', marginBottom: '4px', display: 'block' }}>Target Roles (comma-separated)</label>
+                    <input
+                      className="input"
+                      value={profileData.target_roles.join(', ')}
+                      onChange={(e) => {
+                        const roles = e.target.value.split(',').map(r => r.trim()).filter(Boolean);
+                        updateProfileField('target_roles', roles);
+                      }}
+                      placeholder="e.g. Software Engineer, Machine Learning Engineer"
+                    />
+                  </div>
+                </div>
+
+                {/* Skills Section */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                  <h4 style={{ fontWeight: '700', fontSize: '12px' }}>Skills Categories</h4>
+                  {Object.entries(profileData.skills || {}).map(([category, items], idx) => {
+                    const itemsStr = Array.isArray(items) ? items.join(', ') : String(items);
+                    return (
+                      <div key={category} style={{ display: 'grid', gridTemplateColumns: '150px 1fr 40px', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          className="input"
+                          style={{ height: '28px', fontSize: '11px' }}
+                          value={category}
+                          onChange={(e) => {
+                            const newCategory = e.target.value.trim();
+                            if (!newCategory || newCategory === category) return;
+                            const newSkills = { ...profileData.skills };
+                            newSkills[newCategory] = newSkills[category];
+                            delete newSkills[category];
+                            updateProfileField('skills', newSkills);
+                          }}
+                          placeholder="Category Name"
+                        />
+                        <input
+                          className="input"
+                          style={{ height: '28px', fontSize: '11px' }}
+                          value={itemsStr}
+                          onChange={(e) => {
+                            const newSkills = { ...profileData.skills };
+                            newSkills[category] = e.target.value.split(',').map(s => s.trim()).filter(Boolean);
+                            updateProfileField('skills', newSkills);
+                          }}
+                          placeholder="Python, Java, Go..."
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-xs"
+                          style={{ height: '28px' }}
+                          onClick={() => {
+                            const newSkills = { ...profileData.skills };
+                            delete newSkills[category];
+                            updateProfileField('skills', newSkills);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-xs"
+                    style={{ alignSelf: 'flex-start', marginTop: '4px' }}
+                    onClick={() => {
+                      const newSkills = { ...profileData.skills };
+                      newSkills[`New Category ${Object.keys(newSkills).length + 1}`] = [];
+                      updateProfileField('skills', newSkills);
+                    }}
+                  >
+                    + Add Category
+                  </button>
+                </div>
+
+                {/* Experience Section */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                  <h4 style={{ fontWeight: '700', fontSize: '12px' }}>Work Experience</h4>
+                  {profileData.experience.map((exp: any, expIdx: number) => (
+                    <div key={expIdx} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 40px', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          className="input"
+                          style={{ height: '28px', fontSize: '11px' }}
+                          value={exp.role || ''}
+                          onChange={(e) => {
+                            const next = [...profileData.experience];
+                            next[expIdx] = { ...next[expIdx], role: e.target.value };
+                            updateProfileField('experience', next);
+                          }}
+                          placeholder="Role (e.g. Senior Developer)"
+                        />
+                        <input
+                          className="input"
+                          style={{ height: '28px', fontSize: '11px' }}
+                          value={exp.company || ''}
+                          onChange={(e) => {
+                            const next = [...profileData.experience];
+                            next[expIdx] = { ...next[expIdx], company: e.target.value };
+                            updateProfileField('experience', next);
+                          }}
+                          placeholder="Company (e.g. Google)"
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-xs"
+                          style={{ height: '28px' }}
+                          onClick={() => {
+                            const next = profileData.experience.filter((_: any, i: number) => i !== expIdx);
+                            updateProfileField('experience', next);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* Bullets */}
+                      <div style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)' }}>Bullets (Tailored keywords)</span>
+                        {(exp.bullets || []).map((b: string, bulletIdx: number) => (
+                          <div key={bulletIdx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <input
+                              className="input"
+                              style={{ height: '26px', fontSize: '11px' }}
+                              value={b}
+                              onChange={(e) => {
+                                const nextExps = [...profileData.experience];
+                                const nextBullets = [...(nextExps[expIdx].bullets || [])];
+                                nextBullets[bulletIdx] = e.target.value;
+                                nextExps[expIdx] = { ...nextExps[expIdx], bullets: nextBullets };
+                                updateProfileField('experience', nextExps);
+                              }}
+                              placeholder="Achievement bullet..."
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-xs"
+                              style={{ height: '26px', padding: '0 6px' }}
+                              onClick={() => {
+                                const nextExps = [...profileData.experience];
+                                const nextBullets = (nextExps[expIdx].bullets || []).filter((_: any, i: number) => i !== bulletIdx);
+                                nextExps[expIdx] = { ...nextExps[expIdx], bullets: nextBullets };
+                                updateProfileField('experience', nextExps);
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-xs"
+                          style={{ alignSelf: 'flex-start', height: '24px', fontSize: '10px' }}
+                          onClick={() => {
+                            const nextExps = [...profileData.experience];
+                            const nextBullets = [...(nextExps[expIdx].bullets || []), ''];
+                            nextExps[expIdx] = { ...nextExps[expIdx], bullets: nextBullets };
+                            updateProfileField('experience', nextExps);
+                          }}
+                        >
+                          + Add Bullet
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-xs"
+                    style={{ alignSelf: 'flex-start' }}
+                    onClick={() => {
+                      const next = [...profileData.experience, { role: '', company: '', bullets: [] }];
+                      updateProfileField('experience', next);
+                    }}
+                  >
+                    + Add Experience
+                  </button>
+                </div>
+
+                {/* Projects Section */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border)', paddingTop: '12px' }}>
+                  <h4 style={{ fontWeight: '700', fontSize: '12px' }}>Projects</h4>
+                  {profileData.projects.map((proj: any, projIdx: number) => (
+                    <div key={projIdx} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px', padding: '12px', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 40px', gap: '8px', alignItems: 'center' }}>
+                        <input
+                          className="input"
+                          style={{ height: '28px', fontSize: '11px' }}
+                          value={proj.name || ''}
+                          onChange={(e) => {
+                            const next = [...profileData.projects];
+                            next[projIdx] = { ...next[projIdx], name: e.target.value };
+                            updateProfileField('projects', next);
+                          }}
+                          placeholder="Project Name"
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-danger btn-xs"
+                          style={{ height: '28px' }}
+                          onClick={() => {
+                            const next = profileData.projects.filter((_: any, i: number) => i !== projIdx);
+                            updateProfileField('projects', next);
+                          }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      {/* Bullets */}
+                      <div style={{ paddingLeft: '12px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <span style={{ fontSize: '10px', fontWeight: '600', color: 'var(--text-secondary)' }}>Bullets (Project achievements)</span>
+                        {(proj.bullets || []).map((b: string, bulletIdx: number) => (
+                          <div key={bulletIdx} style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                            <input
+                              className="input"
+                              style={{ height: '26px', fontSize: '11px' }}
+                              value={b}
+                              onChange={(e) => {
+                                const nextProjs = [...profileData.projects];
+                                const nextBullets = [...(nextProjs[projIdx].bullets || [])];
+                                nextBullets[bulletIdx] = e.target.value;
+                                nextProjs[projIdx] = { ...nextProjs[projIdx], bullets: nextBullets };
+                                updateProfileField('projects', nextProjs);
+                              }}
+                              placeholder="Project bullet..."
+                            />
+                            <button
+                              type="button"
+                              className="btn btn-outline btn-xs"
+                              style={{ height: '26px', padding: '0 6px' }}
+                              onClick={() => {
+                                const nextProjs = [...profileData.projects];
+                                const nextBullets = (nextProjs[projIdx].bullets || []).filter((_: any, i: number) => i !== bulletIdx);
+                                nextProjs[projIdx] = { ...nextProjs[projIdx], bullets: nextBullets };
+                                updateProfileField('projects', nextProjs);
+                              }}
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ))}
+                        <button
+                          type="button"
+                          className="btn btn-outline btn-xs"
+                          style={{ alignSelf: 'flex-start', height: '24px', fontSize: '10px' }}
+                          onClick={() => {
+                            const nextProjs = [...profileData.projects];
+                            const nextBullets = [...(nextProjs[projIdx].bullets || []), ''];
+                            nextProjs[projIdx] = { ...nextProjs[projIdx], bullets: nextBullets };
+                            updateProfileField('projects', nextProjs);
+                          }}
+                        >
+                          + Add Bullet
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="btn btn-outline btn-xs"
+                    style={{ alignSelf: 'flex-start' }}
+                    onClick={() => {
+                      const next = [...profileData.projects, { name: '', bullets: [] }];
+                      updateProfileField('projects', next);
+                    }}
+                  >
+                    + Add Project
+                  </button>
+                </div>
+              </div>
+            )}
             {profileUnsaved && (
               <div style={{ fontSize: 11, color: 'var(--amber)', fontWeight: 600 }}>
                 Notice: You have unsaved profile changes. Remember to recompute embeddings after saving!
@@ -294,6 +645,7 @@ export default function SettingsPage() {
                         >
                           <option value="greenhouse">Greenhouse</option>
                           <option value="lever">Lever</option>
+                          <option value="ashby">Ashby</option>
                           <option value="generic">Generic/Other</option>
                         </select>
                       </td>

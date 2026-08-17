@@ -13,6 +13,8 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading } = useSWR<Stats>('/stats', getStats, { refreshInterval: 30000 });
   const { data: health, isLoading: healthLoading } = useSWR<SourceHealth[]>('/health', getSourceHealth, { refreshInterval: 30000 });
 
+  const unhealthySources = (health ?? []).filter(s => s.status === 'error' || s.status === 'degraded');
+
   return (
     <>
       <div className="page-header flex justify-between items-center">
@@ -24,6 +26,37 @@ export default function DashboardPage() {
           View Board →
         </Link>
       </div>
+
+      {/* System Health Alert Banner */}
+      {unhealthySources.length > 0 && (
+        <div
+          className="card flex items-center justify-between gap-4"
+          style={{
+            background: 'var(--red-soft)',
+            border: '1px solid var(--red)',
+            borderRadius: 'var(--radius)',
+            padding: '12px 20px',
+            marginBottom: '20px',
+            color: 'var(--red)',
+            fontSize: '12px',
+            fontWeight: 600
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ width: 18, height: 18, flexShrink: 0 }}>
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span>
+              Warning: {unhealthySources.length} scraper source(s) are currently degraded or offline ({unhealthySources.map(s => s.source).join(', ')}). Please verify backend logs.
+            </span>
+          </div>
+          <a href="#health-table" className="btn btn-danger btn-xs" style={{ background: 'var(--red)', color: 'var(--bg-base)', border: 'none', padding: '4px 10px' }}>
+            View Details
+          </a>
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="stats-grid">
@@ -66,7 +99,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Source Health */}
-      <div className="card mb-6">
+      <div id="health-table" className="card mb-6">
         <div className="flex items-center gap-2 mb-4">
           <h2 style={{ fontSize: 14, fontWeight: 700 }}>Source Health</h2>
         </div>

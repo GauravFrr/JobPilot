@@ -259,7 +259,55 @@ async def get_resume_pdf(job_id: str, version_id: str, db: AsyncSession = Depend
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Resume version not found for this job")
         
     pdf_path = rv.pdf_path
+    if pdf_path and not os.path.exists(pdf_path):
+        filename = pdf_path.replace("\\", "/").split("/")[-1]
+        # Try host layout fallback (api/resumes)
+        fallback_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "resumes", filename))
+        if os.path.exists(fallback_path):
+            pdf_path = fallback_path
+        else:
+            # Try container layout fallback (api/resumes mount)
+            fallback_container_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "api", "resumes", filename))
+            if os.path.exists(fallback_container_path):
+                pdf_path = fallback_container_path
+
     if not pdf_path or not os.path.exists(pdf_path):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tailored PDF file does not exist on disk")
         
-    return FileResponse(pdf_path, media_type="application/pdf", filename=f"Resume_{job_id[:8]}.pdf")
+    # Detect if file is HTML fallback stub or real PDF
+    media_type = "application/pdf"
+    try:
+        with open(pdf_path, "rb") as f:
+            header = f.read(128)
+            if b"%PDF" not in header:
+                media_type = "text/html"
+    except Exception:
+        pass
+        
+    return FileResponse(
+        pdf_path, 
+        media_type=media_type, 
+        filename=f"Resume_{job_id[:8]}.{'pdf' if media_type == 'application/pdf' else 'html'}",
+        content_disposition_type="inline"
+    )
+
+@router.get("/{job_id}/form-preview")
+async def get_job_form_preview(job_id: str, db: AsyncSession = Depends(get_db)):
+    """
+    Returns the pre-filled form screenshot for Tier B applications.
+    """
+    screenshot_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "api", "resumes", f"form_preview_{job_id}.png"))
+    if not os.path.exists(screenshot_path):
+        fallback_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "resumes", f"form_preview_{job_id}.png"))
+        if os.path.exists(fallback_path):
+            screenshot_path = fallback_path
+            
+    if not os.path.exists(screenshot_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Form preview screenshot not found.")
+        
+    return FileResponse(
+        screenshot_path,
+        media_type="image/png",
+        filename=f"form_preview_{job_id}.png",
+        content_disposition_type="inline"
+    )
