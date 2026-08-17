@@ -13,13 +13,13 @@ By scraping public APIs, company career pages, and hiring platforms, JobPilot id
 
 ```mermaid
 graph TD
-    subgraph Data Sources
+    subgraph "Data Sources"
         T1["Tier A: Public APIs (RemoteOK, WWR, Remotive) & Serper Dorks"]
         T2["Tier B: Playwright scrapers (LinkedIn, Naukri, Wellfound, Instahyre)"]
         T3["Tier C: Playwright ATS crawler (Company Career Pages & Greenhouse/Lever/Ashby detection)"]
     end
     
-    subgraph Background Workers (Scheduler Container)
+    subgraph "Background Workers (Scheduler Container)"
         S["APScheduler Loop"] --> Crawler["Discovery Pipelines"]
         Crawler --> Deduplicator["Deduplication Engine"]
         Deduplicator --> PG[("PostgreSQL + pgvector")]
@@ -28,7 +28,7 @@ graph TD
         Tailorer --> Prebuilder["Playwright Form Pre-filler & Screenshot Grabber"]
     end
     
-    subgraph Control Interfaces
+    subgraph "Control Interfaces"
         Bot["Telegram Bot (aiogram)"]
         Web["Next.js Web Dashboard"]
         API["FastAPI Gateway Router"]
