@@ -71,3 +71,10 @@ aa
 aaa
 storage_state/
 
+# Agent instructions, docs, notebooks, and resumes
+.agents/
+AGENT.md
+001.ipynb
+docs/
+resume/
+
